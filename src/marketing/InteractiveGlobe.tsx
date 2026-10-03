@@ -5,11 +5,10 @@ import { useI18n, type Lang } from '../i18n'
 import land from './globeLand.json'
 import './globe.css'
 
-const UI: Record<Lang, { title: string; instructions: string; caption: string; hint: string; pause: string; resume: string }> = {
+const UI: Record<Lang, { title: string; instructions: string; hint: string; pause: string; resume: string }> = {
   en: {
     title: 'Interactive globe',
     instructions: 'Drag to explore the globe, or use the left and right arrow keys to rotate. Press Space to pause or resume. Connections illustrate cross-border payments, not current service availability.',
-    caption: 'Connections across borders',
     hint: 'Drag to explore',
     pause: 'Pause globe',
     resume: 'Resume globe',
@@ -17,7 +16,6 @@ const UI: Record<Lang, { title: string; instructions: string; caption: string; h
   so: {
     title: 'Duni aad dhaqaajin karto',
     instructions: 'Jiid si aad dunida u sahamiso, ama isticmaal fallaaraha bidix iyo midig si aad u rogto. Riix Space si aad u hakiso ama u sii waddo. Xiriirradu waxay tusaale u yihiin lacag-bixinta xuduudaha ka gudubta; ma muujinayaan helitaanka adeegga hadda.',
-    caption: 'Xiriirro xuduudaha ka gudba',
     hint: 'Jiid si aad u sahamiso',
     pause: 'Haki dunida',
     resume: 'Sii wad dunida',
@@ -25,7 +23,6 @@ const UI: Record<Lang, { title: string; instructions: string; caption: string; h
   es: {
     title: 'Globo interactivo',
     instructions: 'Arrastre para explorar el globo o use las flechas izquierda y derecha para girarlo. Pulse Espacio para pausar o reanudar. Las conexiones ilustran pagos transfronterizos, no la disponibilidad actual del servicio.',
-    caption: 'Conexiones sin fronteras',
     hint: 'Arrastre para explorar',
     pause: 'Pausar el globo',
     resume: 'Reanudar el globo',
@@ -33,7 +30,6 @@ const UI: Record<Lang, { title: string; instructions: string; caption: string; h
   'pt-BR': {
     title: 'Globo interativo',
     instructions: 'Arraste para explorar o globo ou use as setas esquerda e direita para girar. Pressione Espaço para pausar ou retomar. As conexões ilustram pagamentos internacionais, não a disponibilidade atual do serviço.',
-    caption: 'Conexões além das fronteiras',
     hint: 'Arraste para explorar',
     pause: 'Pausar o globo',
     resume: 'Retomar o globo',
@@ -41,7 +37,6 @@ const UI: Record<Lang, { title: string; instructions: string; caption: string; h
   ar: {
     title: 'كرة أرضية تفاعلية',
     instructions: 'اسحب لاستكشاف الكرة الأرضية، أو استخدم سهمي اليسار واليمين لتدويرها. اضغط مفتاح المسافة للإيقاف المؤقت أو الاستئناف. توضح الروابط فكرة المدفوعات عبر الحدود ولا تشير إلى توفر الخدمة حالياً.',
-    caption: 'روابط عبر الحدود',
     hint: 'اسحب للاستكشاف',
     pause: 'إيقاف الكرة الأرضية مؤقتاً',
     resume: 'استئناف حركة الكرة الأرضية',
@@ -326,13 +321,11 @@ export function InteractiveGlobe() {
           </g>
         </svg>
       </div>
-      <figcaption className="xt-globe-caption">
-        <span>{copy.caption}</span>
-        <button type="button" className="xt-globe-toggle" onClick={() => setPaused((current) => !current)} aria-pressed={paused}>
+      <div className="xt-globe-controls">
+        <button type="button" className="xt-globe-toggle" onClick={() => setPaused((current) => !current)} aria-pressed={paused} aria-label={paused ? copy.resume : copy.pause}>
           {paused ? <Play size={13} fill="currentColor" aria-hidden="true" /> : <Pause size={13} aria-hidden="true" />}
-          {paused ? copy.resume : copy.pause}
         </button>
-      </figcaption>
+      </div>
       <p className="xt-globe-hint">{copy.hint}</p>
       <p className="sr-only" id={ids.instructions}>{copy.instructions}</p>
     </figure>

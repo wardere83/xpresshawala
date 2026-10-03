@@ -64,19 +64,14 @@
   stroke-opacity: 0.28;
 }
 
-.xt-globe-caption {
+.xt-globe-controls {
   position: relative;
   z-index: 1;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 14px;
-  flex-wrap: wrap;
   margin-top: -30px;
   padding-inline: 12px;
-  color: #b9d0d6;
-  font-size: 11px;
-  letter-spacing: 0.02em;
 }
 
 .xt-globe-hint {
@@ -90,7 +85,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
+  min-width: 44px;
   min-height: 44px;
   padding: 8px 10px;
   border: 1px solid #78d6dd30;
@@ -125,14 +120,8 @@
     margin-block: 8px 18px;
   }
 
-  .xt-globe-caption {
-    gap: 4px 10px;
+  .xt-globe-controls {
     margin-top: -15px;
-    font-size: 10px;
-  }
-
-  .xt-globe-toggle {
-    font-size: 10px;
   }
 }
 
