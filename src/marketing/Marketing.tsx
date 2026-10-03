@@ -7,6 +7,8 @@ import { LanguageSwitcher } from '../components/LanguageSwitcher'
 import { Logo } from '../components/Logo'
 import { useBrandCopy } from './brandCopy'
 import { useCorporateCopy } from './corporateCopy'
+import { InteractiveGlobe } from './InteractiveGlobe'
+import { BrandFilm } from './BrandFilm'
 import './marketing.css'
 
 export function Marketing() {
@@ -65,38 +67,13 @@ export function Marketing() {
                 </Link>
               </div>
             </div>
-            <div className="corporate-globe" aria-hidden="true">
-              <svg viewBox="0 0 520 520" fill="none">
-                <defs>
-                  <radialGradient id="corporate-globe-fill" cx="0.32" cy="0.26" r="0.78">
-                    <stop stopColor="#4bd1d3" stopOpacity="0.23" />
-                    <stop offset="1" stopColor="#0b252f" stopOpacity="0.1" />
-                  </radialGradient>
-                  <linearGradient id="corporate-orbit" x1="90" y1="120" x2="470" y2="410" gradientUnits="userSpaceOnUse">
-                    <stop stopColor="#4bd1d3" stopOpacity="0.12" />
-                    <stop offset="0.55" stopColor="#4bd1d3" />
-                    <stop offset="1" stopColor="#b9d0d6" stopOpacity="0.18" />
-                  </linearGradient>
-                </defs>
-                <circle cx="260" cy="260" r="190" fill="url(#corporate-globe-fill)" stroke="#b9d0d6" strokeOpacity="0.25" />
-                <g stroke="#b9d0d6" strokeOpacity="0.24">
-                  <ellipse cx="260" cy="260" rx="126" ry="190" />
-                  <ellipse cx="260" cy="260" rx="57" ry="190" />
-                  <ellipse cx="260" cy="260" rx="190" ry="66" />
-                  <ellipse cx="260" cy="260" rx="190" ry="135" />
-                  <path d="M70 260H450M260 70V450" />
-                </g>
-                <ellipse cx="260" cy="260" rx="246" ry="107" transform="rotate(-32 260 260)" stroke="url(#corporate-orbit)" strokeWidth="2" />
-                <g fill="#4bd1d3">
-                  <circle cx="110" cy="248" r="5" /><circle cx="379" cy="143" r="5" /><circle cx="388" cy="316" r="5" />
-                </g>
-                <g stroke="#4bd1d3" strokeOpacity="0.22">
-                  <circle cx="110" cy="248" r="13" /><circle cx="379" cy="143" r="13" /><circle cx="388" cy="316" r="13" />
-                </g>
-              </svg>
-            </div>
+            <InteractiveGlobe />
           </div>
         </section>
+
+        <div className="corporate-film">
+          <BrandFilm />
+        </div>
 
         <section className="corporate-company brand-width" aria-labelledby="company-heading">
           <div className="corporate-company-intro">
