@@ -8,6 +8,46 @@ import { assertBalanced, type Posting } from './ledger'
 export class DuplicatePostingError extends Error {}
 
 /**
+ * Prepare postings for the same transaction as a guarded transfer update.
+ * Only the update that installed this operation's unique reference can create
+ * the posting. Dependent evidence uses the exact entry group, so a failed
+ * eligibility claim writes neither money nor a success event/audit record.
+ */
+export function guardedPostingStatements(
+  db: D1Database,
+  transferId: string,
+  kind: 'funding' | 'payout',
+  postings: Posting[],
+  operationReference: string,
+  now: string,
+): { statements: D1PreparedStatement[]; guard: { sql: string; values: string[] } } {
+  assertBalanced(postings)
+  const group = newId('grp')
+  const referenceColumn = kind === 'funding' ? 'payment_intent_id' : 'payout_reference'
+  const status = kind === 'funding' ? 'compliance_hold' : 'completed'
+  const guard = {
+    sql: `EXISTS (SELECT 1 FROM transfer_postings p WHERE p.transfer_id = ? AND p.kind = ? AND p.entry_group = ?)`,
+    values: [transferId, kind, group],
+  }
+  return {
+    guard,
+    statements: [
+      db.prepare(
+        `INSERT INTO transfer_postings (transfer_id, kind, entry_group, created_at)
+         SELECT ?, ?, ?, ? FROM transfers t
+          WHERE t.id = ? AND t.${referenceColumn} = ? AND t.status = ? AND t.paid_at IS NOT NULL`,
+      ).bind(transferId, kind, group, now, transferId, operationReference, status),
+      ...postings.map((posting) => db.prepare(
+        `INSERT INTO ledger_entries
+           (id, transfer_id, account_code, currency, amount_minor, entry_group, description, created_at)
+         SELECT ?, ?, ?, ?, ?, ?, ?, ? WHERE ${guard.sql}`,
+      ).bind(newId('le'), transferId, posting.accountCode, posting.currency, posting.amountMinor,
+             group, posting.description, now, ...guard.values)),
+    ],
+  }
+}
+
+/**
  * Writes a balanced group for a transfer, once and only once.
  *
  * The claim row and the entries go in a single batch, so either both land or

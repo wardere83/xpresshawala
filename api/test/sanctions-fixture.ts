@@ -9,6 +9,7 @@ import { officialFeeds } from '../scripts/refresh-sanctions.mjs'
 export class SqliteD1 {
   sqlite = new DatabaseSync(':memory:')
   beforeExecute?: (sql: string, parameters: unknown[]) => void
+  afterBatch?: () => void
 
   constructor() {
     const directory = new URL('../migrations/', import.meta.url)
@@ -21,14 +22,16 @@ export class SqliteD1 {
 
   async batch(statements: SqliteStatement[]) {
     this.sqlite.exec('BEGIN')
+    let results: ReturnType<SqliteStatement['execute']>[]
     try {
-      const results = statements.map((statement) => statement.execute())
+      results = statements.map((statement) => statement.execute())
       this.sqlite.exec('COMMIT')
-      return results
     } catch (error) {
       this.sqlite.exec('ROLLBACK')
       throw error
     }
+    this.afterBatch?.()
+    return results
   }
 
   close() { this.sqlite.close() }

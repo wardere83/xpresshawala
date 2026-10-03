@@ -305,14 +305,24 @@ export async function screenName(env: Env, name: string, snapshot?: SanctionsDat
          SELECT rowid, search_terms
            FROM sanctions_name_search
           WHERE sanctions_name_search MATCH ? AND snapshot_id = ?
-       ), evidence AS MATERIALIZED (
+       ), long_evidence AS MATERIALIZED (
          SELECT c.rowid, json_extract(s.value, '$.broad') AS broad,
                 json_extract(s.value, '$.strict') AS strict,
                 (SELECT COUNT(*) FROM json_each(json_extract(s.value, '$.terms')) t
                   WHERE instr(' ' || c.search_terms || ' ', ' ' || t.value || ' ') > 0) AS hits
            FROM candidates c JOIN json_each(?) s
+       ), short_evidence AS MATERIALIZED (
+         SELECT sanctions_name_search.rowid, 1 AS broad, 1 AS strict, 1 AS hits
+           FROM json_each(?) s
+           JOIN sanctions_name_search
+             ON sanctions_name_search MATCH json_extract(s.value, '$.wholeWordQuery')
+          WHERE sanctions_name_search.snapshot_id = ?
        ), passing AS (
-         SELECT rowid FROM evidence GROUP BY rowid
+         SELECT rowid FROM (
+           SELECT * FROM long_evidence
+           UNION ALL
+           SELECT * FROM short_evidence
+         ) GROUP BY rowid
          HAVING SUM(hits >= broad) >= ? AND MAX(hits >= strict) >= 1
        )
        SELECT n.name_id, n.entity_id, n.list, n.primary_name, n.name,
@@ -322,7 +332,12 @@ export async function screenName(env: Env, name: string, snapshot?: SanctionsDat
          JOIN sanctions_names n
            ON n.snapshot_id = f.snapshot_id AND n.name_id = f.name_id
         LIMIT ?`,
-    ).bind(query, dataset.version, JSON.stringify(evidence), Math.min(2, evidence.length), SANCTIONS_CANDIDATE_LIMIT + 1).all<NameRow>()
+    ).bind(
+      query, dataset.version,
+      JSON.stringify(evidence.filter((word) => !word.wholeWordQuery)),
+      JSON.stringify(evidence.filter((word) => word.wholeWordQuery)),
+      dataset.version, Math.min(2, evidence.length), SANCTIONS_CANDIDATE_LIMIT + 1,
+    ).all<NameRow>()
     if (!candidates.success) throw new SanctionsUnavailableError('unavailable')
     if (candidates.results.length > SANCTIONS_CANDIDATE_LIMIT) return scoredResult(base, candidates.results, name)
     // An exact name can coexist with other entities' close aliases. Keep those

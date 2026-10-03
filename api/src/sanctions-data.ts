@@ -75,6 +75,7 @@ export interface CandidateWordEvidence {
   terms: string[]
   broad: number
   strict: number
+  wholeWordQuery?: string
 }
 
 /**
@@ -87,7 +88,11 @@ export interface CandidateWordEvidence {
 export function candidateEvidence(name: string): CandidateWordEvidence[] {
   return words(name).map((word) => {
     if (word.length <= 5) {
-      return { terms: [encode('w', word), ...shortWordVariants(word)], broad: 1, strict: 1 }
+      const terms = [...new Set([encode('w', word), ...shortWordVariants(word)])]
+      return {
+        terms, broad: 1, strict: 1,
+        wholeWordQuery: terms.map((term) => `"${term}"`).join(' OR '),
+      }
     }
     const terms = [...new Set(grams(word, 2))]
     const broadLoss = word.length === 6 ? 3 : word.length === 7 ? 4 : 6

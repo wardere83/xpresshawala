@@ -1,13 +1,14 @@
 import { Hono } from 'hono'
-import { newId } from './crypto'
+import { newId, randomHex } from './crypto'
 import { audit } from './audit'
 import { payoutPostings } from './ledger'
-import { DuplicatePostingError, postOnce } from './ledger-db'
+import { guardedPostingStatements } from './ledger-db'
 import type { Env, Vars } from './env'
 import { requireAdmin, requireRole } from './sessions'
 import { staff } from './routes-staff'
 import {
   auditSanctionsUnavailable,
+  complianceAuditStatement,
   parseScreeningEvidence,
   screenTransferSubjects,
   screeningClaimGuard,
@@ -98,43 +99,36 @@ admin.post('/transfers/:id/approve', requireRole('compliance', 'owner'), async (
   }
 
   const guard = screeningClaimGuard(screening, now)
+  const operationReference = `test_${randomHex(8)}`
+  const posting = guardedPostingStatements(c.env.DB, id, 'payout', payoutPostings({
+    receiveAmountMinor: Number(t.receive_amount_minor),
+    receiveCurrency: String(t.receive_currency),
+    reference: String(t.reference),
+  }), operationReference, now)
+  const claimIndex = statements.length
   const results = await c.env.DB.batch([
     ...statements,
     c.env.DB.prepare(
-      `UPDATE transfers SET status = 'completed', completed_at = ?, updated_at = ?
+      `UPDATE transfers SET status = 'completed', completed_at = ?, updated_at = ?,
+              payout_provider = 'test', payout_reference = ?
         WHERE id = ? AND status = 'compliance_hold' AND paid_at IS NOT NULL
           AND EXISTS (SELECT 1 FROM transfer_postings p WHERE p.transfer_id = transfers.id AND p.kind = 'funding')
+          AND NOT EXISTS (SELECT 1 FROM transfer_postings p WHERE p.transfer_id = transfers.id AND p.kind = 'payout')
           ${guard.sql}`,
-    ).bind(now, now, id, ...guard.values),
+    ).bind(now, now, operationReference, id, ...guard.values),
+    ...posting.statements,
+    c.env.DB.prepare(
+      `INSERT INTO transfer_events (id, transfer_id, from_status, to_status, actor_type, actor_id, note, created_at)
+       SELECT ?, ?, 'compliance_hold', 'completed', 'admin', ?, ?, ? WHERE ${posting.guard.sql}`,
+    ).bind(newId('tev'), id, staff.id, c.req.query('note') ?? 'Released by compliance', now, ...posting.guard.values),
+    complianceAuditStatement(c.env, {
+      actorType: 'admin', actorId: staff.id, action: 'transfer.approved',
+      entityType: 'transfer', entityId: id, metadata: { reference: t.reference, role: staff.role, provider: 'test' },
+      ip: c.req.header('cf-connecting-ip'),
+    }, now, posting.guard),
   ])
-  const claim = results[results.length - 1]
+  const claim = results[claimIndex]
   if (claim.meta.changes !== 1) return c.json({ error: 'screening_changed', message: 'Transfer details or screening data changed. Refresh screening and try again.' }, 409)
-
-  try {
-    await postOnce(c.env.DB, id, 'payout', payoutPostings({
-      receiveAmountMinor: Number(t.receive_amount_minor),
-      receiveCurrency: String(t.receive_currency),
-      reference: String(t.reference),
-    }))
-  } catch (err) {
-    if (!(err instanceof DuplicatePostingError)) {
-      await c.env.DB.prepare(
-        `UPDATE transfers SET status = 'compliance_hold', completed_at = NULL, updated_at = ? WHERE id = ?`,
-      ).bind(new Date().toISOString(), id).run()
-      throw err
-    }
-  }
-
-  await c.env.DB.prepare(
-    `INSERT INTO transfer_events (id, transfer_id, from_status, to_status, actor_type, actor_id, note, created_at)
-     VALUES (?, ?, 'compliance_hold', 'completed', 'admin', ?, ?, ?)`,
-  ).bind(newId('tev'), id, staff.id, c.req.query('note') ?? 'Released by compliance', now).run()
-
-  await audit(c.env.DB, {
-    actorType: 'admin', actorId: staff.id, action: 'transfer.approved',
-    entityType: 'transfer', entityId: id, metadata: { reference: t.reference, role: staff.role },
-    ip: c.req.header('cf-connecting-ip'),
-  })
   return c.json({ ok: true, status: 'completed' })
 })
 
@@ -290,19 +284,25 @@ admin.post('/screenings/:id/clear', requireRole('compliance', 'owner'), async (c
   }
   const now = new Date().toISOString()
   const guard = screeningClaimGuard(screening, now)
-  const reviewedEvidence = { ...evidence, review: { reason, reviewerId: actor.id, reviewedAt: now } }
-  const result = await c.env.DB.prepare(
-    `UPDATE sanctions_screenings SET cleared_by = ?, cleared_at = ?, match_json = ?
-      WHERE id = ? AND status = 'potential_match' AND cleared_by IS NULL AND cleared_at IS NULL AND match_json = ?
-        AND EXISTS (SELECT 1 FROM transfers WHERE transfers.id = sanctions_screenings.transfer_id ${guard.sql})`,
-  ).bind(actor.id, now, JSON.stringify(reviewedEvidence), id, record.match_json, ...guard.values).run()
-  if (result.meta.changes !== 1) return c.json({ error: 'screening_changed', message: 'Screening details changed. Refresh and try again.' }, 409)
-  await audit(c.env.DB, {
-    actorType: 'admin', actorId: actor.id, action: 'sanctions.false_positive_cleared', entityType: 'screening', entityId: id,
-    metadata: { reason, transferId: record.transfer_id, subjectType: record.subject_type, subjectId: record.subject_id,
-      subjectName: evidence.subjectName, datasetHash: evidence.datasetHash, entityIds: evidence.matches.map((match) => match.entityId) },
-    ip: c.req.header('cf-connecting-ip'),
-  })
+  const decisionId = newId('srev')
+  const reviewedEvidence = JSON.stringify({ ...evidence, review: { reason, reviewerId: actor.id, reviewedAt: now, decisionId } })
+  const results = await c.env.DB.batch([
+    c.env.DB.prepare(
+      `UPDATE sanctions_screenings SET cleared_by = ?, cleared_at = ?, match_json = ?
+        WHERE id = ? AND status = 'potential_match' AND cleared_by IS NULL AND cleared_at IS NULL AND match_json = ?
+          AND EXISTS (SELECT 1 FROM transfers WHERE transfers.id = sanctions_screenings.transfer_id ${guard.sql})`,
+    ).bind(actor.id, now, reviewedEvidence, id, record.match_json, ...guard.values),
+    complianceAuditStatement(c.env, {
+      actorType: 'admin', actorId: actor.id, action: 'sanctions.false_positive_cleared', entityType: 'screening', entityId: id,
+      metadata: { decisionId, reason, transferId: record.transfer_id, subjectType: record.subject_type, subjectId: record.subject_id,
+        subjectName: evidence.subjectName, datasetHash: evidence.datasetHash, entityIds: evidence.matches.map((match) => match.entityId) },
+      ip: c.req.header('cf-connecting-ip'),
+    }, now, {
+      sql: `EXISTS (SELECT 1 FROM sanctions_screenings s WHERE s.id = ? AND s.cleared_by = ? AND s.cleared_at = ? AND s.match_json = ?)`,
+      values: [id, actor.id, now, reviewedEvidence],
+    }),
+  ])
+  if (results[0].meta.changes !== 1) return c.json({ error: 'screening_changed', message: 'Screening details changed. Refresh and try again.' }, 409)
   return c.json({ ok: true, screening_id: id, cleared_by: actor.id, cleared_at: now })
 })
 

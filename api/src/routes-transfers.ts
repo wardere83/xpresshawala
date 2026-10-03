@@ -2,13 +2,14 @@ import { Hono } from 'hono'
 import { newId, randomHex, verifyPassword } from './crypto'
 import { audit } from './audit'
 import { fundingPostings } from './ledger'
-import { DuplicatePostingError, postOnce } from './ledger-db'
+import { guardedPostingStatements } from './ledger-db'
 import { QuoteError, quote, type Corridor } from './money'
 import type { Env, Vars } from './env'
 import { requireUser } from './sessions'
 import {
   auditSanctionsUnavailable,
   checkLimits,
+  complianceAuditStatement,
   reportingFlags,
   screenTransferSubjects,
   screeningClaimGuard,
@@ -342,6 +343,16 @@ transfers.post('/transfers/:id/pay', async (c) => {
   }
 
   const guard = screeningClaimGuard(screening, now)
+  const operationReference = `test_${randomHex(8)}`
+  const posting = guardedPostingStatements(c.env.DB, id, 'funding', fundingPostings({
+    sendAmountMinor: Number(t.send_amount_minor),
+    feeMinor: Number(t.fee_minor),
+    receiveAmountMinor: Number(t.receive_amount_minor),
+    sendCurrency: String(t.send_currency),
+    receiveCurrency: String(t.receive_currency),
+    reference: String(t.reference),
+  }), operationReference, now)
+  const claimIndex = statements.length
   const results = await c.env.DB.batch([
     ...statements,
     c.env.DB.prepare(
@@ -350,41 +361,20 @@ transfers.post('/transfers/:id/pay', async (c) => {
         WHERE id = ? AND user_id = ? AND status = ? AND paid_at IS NULL
           AND NOT EXISTS (SELECT 1 FROM transfer_postings p WHERE p.transfer_id = transfers.id AND p.kind = 'funding')
           ${guard.sql}`,
-    ).bind(now, now, `test_${randomHex(8)}`, id, user.id, String(t.status), ...guard.values),
+    ).bind(now, now, operationReference, id, user.id, String(t.status), ...guard.values),
+    ...posting.statements,
+    c.env.DB.prepare(
+      `INSERT INTO transfer_events (id, transfer_id, from_status, to_status, actor_type, actor_id, note, created_at)
+       SELECT ?, ?, ?, 'compliance_hold', 'system', NULL, 'Test payment captured', ? WHERE ${posting.guard.sql}`,
+    ).bind(newId('tev'), id, String(t.status), now, ...posting.guard.values),
+    complianceAuditStatement(c.env, {
+      actorType: 'customer', actorId: user.id, action: 'transfer.paid',
+      entityType: 'transfer', entityId: id, metadata: { provider: 'test' },
+      ip: c.req.header('cf-connecting-ip'),
+    }, now, posting.guard),
   ])
-  const claim = results[results.length - 1]
+  const claim = results[claimIndex]
   if (claim.meta.changes !== 1) return c.json({ error: 'screening_changed', message: 'Transfer details or screening data changed. Please try again.' }, 409)
-
-  try {
-    await postOnce(c.env.DB, id, 'funding', fundingPostings({
-      sendAmountMinor: Number(t.send_amount_minor),
-      feeMinor: Number(t.fee_minor),
-      receiveAmountMinor: Number(t.receive_amount_minor),
-      sendCurrency: String(t.send_currency),
-      receiveCurrency: String(t.receive_currency),
-      reference: String(t.reference),
-    }))
-  } catch (err) {
-    if (!(err instanceof DuplicatePostingError)) {
-      // The claim succeeded but the money was not booked. Put the transfer back
-      // so it is retried, rather than leaving it paid with no accounting.
-      await c.env.DB.prepare(
-        `UPDATE transfers SET status = ?, paid_at = NULL, updated_at = ? WHERE id = ? AND status = 'compliance_hold' AND payment_provider = 'test'`,
-      ).bind(String(t.status), new Date().toISOString(), id).run()
-      throw err
-    }
-  }
-
-  await c.env.DB.prepare(
-    `INSERT INTO transfer_events (id, transfer_id, from_status, to_status, actor_type, actor_id, note, created_at)
-     VALUES (?, ?, ?, 'compliance_hold', 'system', NULL, 'Test payment captured', ?)`,
-  ).bind(newId('tev'), id, String(t.status), now).run()
-
-  await audit(c.env.DB, {
-    actorType: 'customer', actorId: user.id, action: 'transfer.paid',
-    entityType: 'transfer', entityId: id, metadata: { provider: 'test' },
-    ip: c.req.header('cf-connecting-ip'),
-  })
 
   return c.json({ ok: true, status: 'compliance_hold', testMode: true })
 })

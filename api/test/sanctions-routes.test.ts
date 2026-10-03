@@ -23,6 +23,10 @@ before(async () => {
     return import(pathToFileURL(outfile).href)
   }))
   app = new Hono()
+  // Each bundle contains Hono's default error handler. Supply the same JSON
+  // failure contract as the application so injected SQL failures stay testable.
+  routes[0].transfers.onError((_error, c) => c.json({ error: 'internal_error' }, 500))
+  routes[1].admin.onError((_error, c) => c.json({ error: 'internal_error' }, 500))
   app.route('/', routes[0].transfers)
   app.route('/admin', routes[1].admin)
 })
@@ -258,7 +262,7 @@ test('a prior false-positive decision cannot clear a changed dataset or changed 
 })
 
 test('a party, KYC or dataset change between payment screening and claim cannot fund the transfer', async (t) => {
-  for (const change of ['name', 'kyc', 'valid-tier', 'dataset']) {
+  for (const change of ['name', 'kyc', 'valid-tier', 'recipient-id', 'dataset']) {
     await t.test(change, async (context) => {
       const fixture = await setup(context)
       const created = await fixture.create()
@@ -271,6 +275,11 @@ test('a party, KYC or dataset change between payment screening and claim cannot 
         if (change === 'name') fixture.db.sqlite.prepare('UPDATE users SET first_name=?').run('Ivan')
         else if (change === 'kyc') fixture.db.sqlite.exec("UPDATE users SET kyc_status='unverified',kyc_tier=0")
         else if (change === 'valid-tier') fixture.db.sqlite.exec('UPDATE users SET kyc_tier=1')
+        else if (change === 'recipient-id') {
+          fixture.db.sqlite.exec(`INSERT INTO recipients (id,user_id,full_name,country,payout_method,created_at,updated_at)
+            SELECT 'recipient-2',user_id,full_name,country,payout_method,created_at,updated_at FROM recipients WHERE id='recipient-1'`)
+          fixture.db.sqlite.prepare('UPDATE transfers SET recipient_id=? WHERE id=?').run('recipient-2', created.body.transfer.id)
+        }
         else seedDataset(fixture.db, { hash: createHash('sha256').update('new-dataset-during-claim').digest('hex') })
       }
       const response = await fixture.pay(created.body.transfer.id)
@@ -283,7 +292,7 @@ test('a party, KYC or dataset change between payment screening and claim cannot 
 })
 
 test('a changed party or snapshot between release screening and claim cannot book payout', async (t) => {
-  for (const change of ['name', 'dataset']) {
+  for (const change of ['name', 'recipient-id', 'dataset']) {
     await t.test(change, async (context) => {
       const fixture = await setup(context)
       const created = await fixture.create()
@@ -295,6 +304,11 @@ test('a changed party or snapshot between release screening and claim cannot boo
         fixture.db.beforeExecute = undefined
         intercepted = true
         if (change === 'name') fixture.db.sqlite.prepare('UPDATE recipients SET full_name=?').run('Ivan Sergeyevich Petrov')
+        else if (change === 'recipient-id') {
+          fixture.db.sqlite.exec(`INSERT INTO recipients (id,user_id,full_name,country,payout_method,created_at,updated_at)
+            SELECT 'recipient-2',user_id,full_name,country,payout_method,created_at,updated_at FROM recipients WHERE id='recipient-1'`)
+          fixture.db.sqlite.prepare('UPDATE transfers SET recipient_id=? WHERE id=?').run('recipient-2', id)
+        }
         else seedDataset(fixture.db, { hash: createHash('sha256').update('new-dataset-during-release').digest('hex') })
       }
       const response = await fixture.approve(id)
@@ -304,5 +318,142 @@ test('a changed party or snapshot between release screening and claim cannot boo
       assert.equal(postingCount(fixture.db, 'funding'), 1)
       assert.equal(postingCount(fixture.db, 'payout'), 0)
     })
+  }
+})
+
+test('failed funding bookkeeping rolls back payment, accounting, events and audit together', async (t) => {
+  for (const table of ['ledger_entries', 'transfer_events', 'audit_log']) {
+    await t.test(table, async (context) => {
+      const fixture = await setup(context)
+      const created = await fixture.create()
+      const id = created.body.transfer.id
+      const beforeEvents = fixture.db.sqlite.prepare('SELECT COUNT(*) AS n FROM transfer_events WHERE transfer_id=?').get(id)!.n
+      const beforeAudit = fixture.db.sqlite.prepare('SELECT COUNT(*) AS n FROM audit_log WHERE entity_id=?').get(id)!.n
+      // A real SQL failure after the money claim must undo the entire operation.
+      fixture.db.sqlite.exec(`CREATE TRIGGER fail_bookkeeping BEFORE INSERT ON ${table}
+        BEGIN SELECT RAISE(ABORT, 'injected storage failure'); END`)
+      assert.equal((await fixture.pay(id)).status, 500)
+      const transfer = fixture.db.sqlite.prepare('SELECT status,paid_at,payment_intent_id FROM transfers WHERE id=?').get(id)!
+      assert.equal(transfer.status, 'awaiting_payment')
+      assert.equal(transfer.paid_at, null)
+      assert.equal(transfer.payment_intent_id, null)
+      assert.equal(postingCount(fixture.db), 0)
+      assert.equal(fixture.db.sqlite.prepare('SELECT COUNT(*) AS n FROM ledger_entries').get()!.n, 0)
+      assert.equal(fixture.db.sqlite.prepare('SELECT COUNT(*) AS n FROM transfer_events WHERE transfer_id=?').get(id)!.n, beforeEvents)
+      assert.equal(fixture.db.sqlite.prepare('SELECT COUNT(*) AS n FROM audit_log WHERE entity_id=?').get(id)!.n, beforeAudit)
+      fixture.db.sqlite.exec('DROP TRIGGER fail_bookkeeping')
+      assert.equal((await fixture.pay(id)).status, 200, 'a failed atomic operation must remain safely retryable')
+      assert.equal(postingCount(fixture.db, 'funding'), 1)
+    })
+  }
+})
+
+test('failed payout bookkeeping preserves funded hold and rolls back release evidence together', async (t) => {
+  for (const table of ['ledger_entries', 'transfer_events', 'audit_log']) {
+    await t.test(table, async (context) => {
+      const fixture = await setup(context)
+      const created = await fixture.create()
+      const id = created.body.transfer.id
+      assert.equal((await fixture.pay(id)).status, 200)
+      const baseline = {
+        ledger: fixture.db.sqlite.prepare('SELECT COUNT(*) AS n FROM ledger_entries').get()!.n,
+        events: fixture.db.sqlite.prepare('SELECT COUNT(*) AS n FROM transfer_events WHERE transfer_id=?').get(id)!.n,
+        audit: fixture.db.sqlite.prepare('SELECT COUNT(*) AS n FROM audit_log WHERE entity_id=?').get(id)!.n,
+      }
+      fixture.db.sqlite.exec(`CREATE TRIGGER fail_bookkeeping BEFORE INSERT ON ${table}
+        BEGIN SELECT RAISE(ABORT, 'injected storage failure'); END`)
+      assert.equal((await fixture.approve(id)).status, 500)
+      const transfer = fixture.db.sqlite.prepare('SELECT status,paid_at,completed_at,payout_reference FROM transfers WHERE id=?').get(id)!
+      assert.equal(transfer.status, 'compliance_hold')
+      assert.ok(transfer.paid_at)
+      assert.equal(transfer.completed_at, null)
+      assert.equal(transfer.payout_reference, null)
+      assert.equal(postingCount(fixture.db, 'funding'), 1)
+      assert.equal(postingCount(fixture.db, 'payout'), 0)
+      assert.equal(fixture.db.sqlite.prepare('SELECT COUNT(*) AS n FROM ledger_entries').get()!.n, baseline.ledger)
+      assert.equal(fixture.db.sqlite.prepare('SELECT COUNT(*) AS n FROM transfer_events WHERE transfer_id=?').get(id)!.n, baseline.events)
+      assert.equal(fixture.db.sqlite.prepare('SELECT COUNT(*) AS n FROM audit_log WHERE entity_id=?').get(id)!.n, baseline.audit)
+      fixture.db.sqlite.exec('DROP TRIGGER fail_bookkeeping')
+      assert.equal((await fixture.approve(id)).status, 200)
+      assert.equal(postingCount(fixture.db, 'payout'), 1)
+    })
+  }
+})
+
+test('a failed false-positive audit leaves the match unresolved and retryable', async (t) => {
+  const fixture = await setup(t, { recipientName: 'Ivan Sergeyevich Petrov' })
+  const created = await fixture.create()
+  const id = created.body.transfer.id
+  const record = fixture.db.sqlite.prepare(`SELECT id,match_json FROM sanctions_screenings
+    WHERE transfer_id=? AND status='potential_match'`).get(id)!
+  const reason = 'Reviewed identity documents and verified this customer is a different person.'
+  fixture.db.sqlite.exec(`CREATE TRIGGER fail_review_audit BEFORE INSERT ON audit_log
+    BEGIN SELECT RAISE(ABORT, 'injected audit failure'); END`)
+  const path = `/admin/screenings/${record.id}/clear`
+  assert.equal((await fixture.request(path, { reason }, fixture.sessions.staffCookies.compliance)).status, 500)
+  const row = fixture.db.sqlite.prepare('SELECT cleared_by,cleared_at,match_json FROM sanctions_screenings WHERE id=?').get(record.id)!
+  assert.equal(row.cleared_by, null)
+  assert.equal(row.cleared_at, null)
+  assert.equal(row.match_json, record.match_json)
+  const review = await fixture.request(`/admin/transfers/${id}/screenings`, undefined, fixture.sessions.staffCookies.compliance)
+  assert.equal(review.body.review_required, true)
+  assert.equal(postingCount(fixture.db), 0)
+  fixture.db.sqlite.exec('DROP TRIGGER fail_review_audit')
+  assert.equal((await fixture.request(path, { reason }, fixture.sessions.staffCookies.compliance)).status, 200)
+  assert.equal((await fixture.request(`/admin/transfers/${id}/screenings`, undefined, fixture.sessions.staffCookies.compliance)).body.review_required, false)
+})
+
+test('observable payment and release commits always include their matching accounting and audit evidence', async (t) => {
+  const fixture = await setup(t)
+  const created = await fixture.create()
+  const id = created.body.transfer.id
+  const observations: {
+    status: string; paid: boolean; funding: number; payout: number; paidAudit: number; releaseAudit: number;
+    paidEvents: number; releaseEvents: number;
+    ledger: { kind: string; entries: number; total: number | null }[];
+  }[] = []
+  fixture.db.afterBatch = () => {
+    const row = fixture.db.sqlite.prepare('SELECT status,paid_at FROM transfers WHERE id=?').get(id)!
+    observations.push({
+      status: String(row.status), paid: !!row.paid_at,
+      funding: postingCount(fixture.db, 'funding'), payout: postingCount(fixture.db, 'payout'),
+      paidAudit: Number(fixture.db.sqlite.prepare("SELECT COUNT(*) AS n FROM audit_log WHERE entity_id=? AND action='transfer.paid'").get(id)!.n),
+      releaseAudit: Number(fixture.db.sqlite.prepare("SELECT COUNT(*) AS n FROM audit_log WHERE entity_id=? AND action='transfer.approved'").get(id)!.n),
+      paidEvents: Number(fixture.db.sqlite.prepare("SELECT COUNT(*) AS n FROM transfer_events WHERE transfer_id=? AND to_status='compliance_hold'").get(id)!.n),
+      releaseEvents: Number(fixture.db.sqlite.prepare("SELECT COUNT(*) AS n FROM transfer_events WHERE transfer_id=? AND to_status='completed'").get(id)!.n),
+      ledger: fixture.db.sqlite.prepare(`SELECT p.kind,COUNT(e.id) AS entries,SUM(e.amount_minor) AS total
+        FROM transfer_postings p LEFT JOIN ledger_entries e ON e.entry_group=p.entry_group AND e.transfer_id=p.transfer_id
+        WHERE p.transfer_id=? GROUP BY p.kind,e.currency`).all(id).map((entry) => ({
+        kind: String(entry.kind), entries: Number(entry.entries), total: entry.total === null ? null : Number(entry.total),
+      })),
+    })
+  }
+  assert.equal((await fixture.pay(id)).status, 200)
+  assert.equal((await fixture.approve(id)).status, 200)
+  assert.ok(observations.some((row) => row.paid), 'observe a committed payment')
+  assert.ok(observations.some((row) => row.status === 'completed'), 'observe a committed release')
+  for (const row of observations) {
+    if (row.paid) {
+      assert.equal(row.funding, 1, 'another request cannot observe paid without funding evidence')
+      assert.equal(row.paidAudit, 1)
+      assert.equal(row.paidEvents, 1)
+      const groups = row.ledger.filter((entry) => entry.kind === 'funding')
+      assert.ok(groups.length)
+      for (const group of groups) {
+        assert.ok(group.entries > 0, 'a posting claim cannot stand in for actual accounting entries')
+        assert.equal(group.total, 0, 'committed funding entries balance within each currency')
+      }
+    }
+    if (row.status === 'completed') {
+      assert.equal(row.payout, 1, 'another request cannot observe completed before payout evidence')
+      assert.equal(row.releaseAudit, 1)
+      assert.equal(row.releaseEvents, 1)
+      const groups = row.ledger.filter((entry) => entry.kind === 'payout')
+      assert.ok(groups.length)
+      for (const group of groups) {
+        assert.ok(group.entries > 0)
+        assert.equal(group.total, 0, 'committed payout entries balance within each currency')
+      }
+    }
   }
 })

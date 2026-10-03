@@ -1,5 +1,6 @@
 import type { Env } from './env'
 import { audit } from './audit'
+import { newId } from './crypto'
 import {
   SanctionsUnavailableError,
   loadFreshSanctionsDataset,
@@ -134,7 +135,7 @@ export interface StoredScreening {
 export interface ScreeningEvidence extends ScreeningResult {
   subjectName: string
   stage?: string
-  review?: { reason: string; reviewerId: string; reviewedAt: string }
+  review?: { reason: string; reviewerId: string; reviewedAt: string; decisionId?: string }
 }
 
 export function parseScreeningEvidence(value: string | null): ScreeningEvidence | null {
@@ -251,6 +252,23 @@ export function transferScreeningStatements(env: Env, transferId: string, screen
   }, result))
 }
 
+/** Prepare append-only audit evidence in the transaction making the decision. */
+export function complianceAuditStatement(
+  env: Env,
+  entry: Parameters<typeof audit>[1],
+  now: string,
+  guard: { sql: string; values: (string | number)[] },
+): D1PreparedStatement {
+  return env.DB.prepare(
+    `INSERT INTO audit_log
+       (id, actor_type, actor_id, action, entity_type, entity_id, metadata, ip, user_agent, created_at)
+     SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ? WHERE ${guard.sql}`,
+  ).bind(newId('aud'), entry.actorType, entry.actorId ?? null, entry.action,
+         entry.entityType ?? null, entry.entityId ?? null,
+         entry.metadata === undefined ? null : JSON.stringify(entry.metadata),
+         entry.ip ?? null, entry.userAgent ?? null, now, ...guard.values)
+}
+
 /** Repeat mutable eligibility checks in the same SQL statement that claims money. */
 export function screeningClaimGuard(screening: TransferScreening, now: string): { sql: string; values: (string | number)[] } {
   return {
@@ -264,13 +282,14 @@ export function screeningClaimGuard(screening: TransferScreening, now: string): 
       )
       AND EXISTS (
         SELECT 1 FROM users u WHERE u.id = transfers.user_id
+          AND u.id = ?
           AND u.status = 'active' AND u.kyc_status = 'verified'
           AND u.kyc_tier BETWEEN 1 AND 3 AND u.kyc_tier = CAST(u.kyc_tier AS INTEGER)
           AND u.first_name = ? AND u.last_name = ? AND u.kyc_tier = ?
       )
       AND EXISTS (
         SELECT 1 FROM recipients r WHERE r.id = transfers.recipient_id
-          AND r.user_id = transfers.user_id AND r.archived_at IS NULL AND r.full_name = ?
+          AND r.id = ? AND r.user_id = transfers.user_id AND r.archived_at IS NULL AND r.full_name = ?
       )
       AND NOT EXISTS (
         SELECT 1 FROM sanctions_screenings s WHERE s.transfer_id = transfers.id
@@ -281,9 +300,11 @@ export function screeningClaimGuard(screening: TransferScreening, now: string): 
       screening.dataset.contentSha256,
       new Date(new Date(now).getTime() - 24 * 3600_000).toISOString(),
       now,
+      screening.subjects.sender.subjectId,
       screening.subjects.firstName,
       screening.subjects.lastName,
       screening.subjects.kycTier,
+      screening.subjects.recipient.subjectId,
       screening.subjects.recipient.name,
     ],
   }
