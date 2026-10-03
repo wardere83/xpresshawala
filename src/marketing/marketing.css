@@ -1,3 +1,291 @@
+/* Company presentation, shared with the public institutional pages. */
+.corporate-site .brand-header-inner {
+  height: 94px;
+}
+.corporate-nav a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #18313b;
+  transition: color 0.2s;
+}
+.corporate-nav a:hover {
+  color: #476771;
+}
+.corporate-hero {
+  overflow: hidden;
+  background: #0b252f;
+  color: #fff;
+}
+.corporate-hero-inner {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
+  gap: 32px;
+  align-items: center;
+  min-height: 610px;
+  padding-block: 80px;
+}
+.corporate-hero .brand-eyebrow {
+  color: #4bd1d3;
+}
+.corporate-hero h1 {
+  font-size: clamp(42px, 4.65vw, 72px);
+  font-weight: 400;
+  line-height: 1.1;
+  letter-spacing: -0.05em;
+  margin-block: 25px;
+  text-wrap: balance;
+}
+.corporate-hero h1 span {
+  color: #b9d0d6;
+}
+.corporate-intro {
+  max-width: 550px;
+  font-size: 16px;
+  line-height: 1.85;
+  color: #b9d0d6;
+}
+.corporate-site .brand-actions {
+  justify-content: flex-start;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+.corporate-hero .brand-primary,
+.corporate-partners .brand-primary {
+  background: #4bd1d3;
+  color: #0b252f;
+}
+.corporate-hero .brand-primary:hover,
+.corporate-partners .brand-primary:hover {
+  background: #b9d0d6;
+}
+.corporate-hero .brand-text-link {
+  color: #fff;
+}
+.corporate-globe {
+  position: relative;
+  width: 100%;
+  max-width: 540px;
+  justify-self: center;
+  background: radial-gradient(circle, #4bd1d30a, transparent 65%);
+}
+.corporate-globe svg {
+  display: block;
+  width: 100%;
+}
+.corporate-company {
+  padding-block: 88px 64px;
+}
+.corporate-company-intro {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 0.85fr);
+  gap: 80px;
+  align-items: center;
+}
+.corporate-site .brand-display {
+  font-size: clamp(32px, 3.2vw, 46px);
+  line-height: 1.17;
+}
+.corporate-site .brand-body {
+  max-width: 530px;
+}
+.corporate-company .brand-text-link {
+  margin-top: 18px;
+}
+.corporate-facts {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 28px;
+  border-top: 1px solid #d7e2e6;
+  margin-top: 50px;
+  padding-top: 30px;
+}
+.corporate-facts dt {
+  font-size: 11px;
+  color: #627780;
+  margin-bottom: 10px;
+}
+.corporate-facts dd {
+  font-size: 16px;
+  color: #18313b;
+}
+.corporate-facts a {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.corporate-facts a:hover {
+  text-decoration: underline;
+}
+.corporate-principles {
+  padding-block: 76px 84px;
+  background: #eff4f5;
+  border-block: 1px solid #e5edef;
+}
+.corporate-cards {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 24px;
+  margin-top: 38px;
+}
+.corporate-card {
+  background: #fff;
+  border: 1px solid #d7e2e6;
+  border-radius: 16px;
+  padding: 30px;
+}
+.corporate-card > svg {
+  color: #476771;
+  margin-bottom: 26px;
+}
+.corporate-card h3 {
+  font-size: 18px;
+  font-weight: 500;
+  margin-bottom: 14px;
+}
+.corporate-card p {
+  font-size: 14px;
+  line-height: 1.8;
+  color: #627780;
+}
+.corporate-partners {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 200px;
+  align-items: center;
+  gap: 48px;
+  background: #0b252f;
+  border-radius: 22px;
+  margin-block: 80px;
+  padding: 60px;
+  color: #fff;
+}
+.corporate-partners .brand-eyebrow {
+  color: #4bd1d3;
+}
+.corporate-partners .brand-body {
+  color: #b9d0d6;
+  max-width: 650px;
+}
+.corporate-partners .brand-text-link {
+  color: #fff;
+}
+.corporate-partner-icon {
+  color: #4bd1d3;
+  justify-self: center;
+}
+.corporate-site .brand-trust-links a {
+  min-height: 66px;
+}
+.corporate-site .brand-footer-copyright {
+  color: #627780;
+}
+@media (max-width: 1000px) {
+  .corporate-hero-inner {
+    gap: 12px;
+    min-height: 540px;
+    padding-block: 65px;
+  }
+  .corporate-company-intro {
+    gap: 36px;
+  }
+  .corporate-partners {
+    padding: 40px;
+    grid-template-columns: minmax(0, 1fr) 130px;
+    gap: 28px;
+  }
+  .corporate-partner-icon {
+    width: 120px;
+  }
+  .corporate-card {
+    padding: 24px;
+  }
+}
+@media (max-width: 760px) {
+  .corporate-site .brand-header-inner {
+    height: auto;
+    padding-block: 18px 8px;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .corporate-nav {
+    order: 3;
+    flex-basis: 100%;
+    justify-content: space-between;
+    gap: 8px;
+  }
+  .corporate-nav a {
+    font-size: 12px;
+  }
+  .corporate-site .brand-wordmark [role='img'] {
+    height: 36px !important;
+  }
+  .corporate-site .brand-wordmark [aria-hidden='true']:first-child {
+    font-size: 23px !important;
+  }
+  .corporate-site .brand-wordmark [aria-hidden='true']:last-child {
+    font-size: 13px !important;
+  }
+  .corporate-hero-inner {
+    grid-template-columns: minmax(0, 1fr);
+    min-height: auto;
+    padding-block: 60px 25px;
+  }
+  .corporate-hero h1 {
+    font-size: clamp(37px, 7.6vw, 54px);
+  }
+  .corporate-intro {
+    font-size: 14px;
+  }
+  .corporate-globe {
+    width: min(75%, 300px);
+    margin-top: 12px;
+  }
+  .corporate-company {
+    padding-block: 55px;
+  }
+  .corporate-company-intro {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 10px;
+  }
+  .corporate-site .brand-body {
+    margin-inline: 0;
+  }
+  .corporate-facts {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 23px;
+    margin-top: 30px;
+    padding-top: 25px;
+  }
+  .corporate-principles {
+    padding-block: 55px;
+  }
+  .corporate-cards {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 14px;
+    margin-top: 28px;
+  }
+  .corporate-card > svg {
+    margin-bottom: 18px;
+  }
+  .corporate-partners {
+    grid-template-columns: minmax(0, 1fr);
+    padding: 30px 24px;
+    margin-block: 45px;
+    gap: 25px;
+  }
+  .corporate-partner-icon {
+    display: none;
+  }
+  .corporate-site .brand-actions {
+    gap: 12px;
+  }
+  .corporate-site .brand-trust-links {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 .brand-site {
   background: #fafcfc;
   color: var(--color-xt-navy);

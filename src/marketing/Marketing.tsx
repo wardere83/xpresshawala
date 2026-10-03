@@ -1,39 +1,31 @@
-import { Link, useNavigate } from 'react-router-dom'
-import { ArrowUpRight, Play } from 'lucide-react'
+import { useEffect } from 'react'
+import { Link } from 'react-router-dom'
+import { ArrowUpRight, Globe2, ShieldCheck, Languages, ScanLine } from 'lucide-react'
 import { brand } from '../config/brand'
 import { useT } from '../i18n'
 import { LanguageSwitcher } from '../components/LanguageSwitcher'
 import { Logo } from '../components/Logo'
-import { useAuth } from '../auth/AuthContext'
-import { DownloadAppMenu } from './DownloadAppMenu'
-import { GetTheApp } from './GetTheApp'
-import { RateQuote } from './RateQuote'
-import { BrandFilm } from './BrandFilm'
-import { AppShowcase } from './AppShowcase'
 import { useBrandCopy } from './brandCopy'
+import { useCorporateCopy } from './corporateCopy'
 import './marketing.css'
 
 export function Marketing() {
   const t = useT()
-  const copy = useBrandCopy()
-  const { user, enterDemo } = useAuth()
-  const navigate = useNavigate()
-  const explore = () => {
-    if (!user) enterDemo()
-    navigate('/app')
-  }
-  const scrollTo = (id: string) => {
-    document
-      .getElementById(id)
-      ?.scrollIntoView({
-        behavior: matchMedia('(prefers-reduced-motion: reduce)').matches
-          ? 'instant'
-          : 'smooth',
-        block: 'start',
-      })
-  }
+  const labels = useBrandCopy()
+  const copy = useCorporateCopy()
+  const companyLinks = [
+    { to: '/company', label: labels.trustCompany },
+    { to: '/compliance', label: labels.trustCompliance },
+    { to: '/security', label: labels.trustSecurity },
+    { to: '/partners', label: labels.trustPartners },
+  ]
+
+  useEffect(() => {
+    window.scrollTo(0, 0)
+  }, [])
+
   return (
-    <div className="brand-site">
+    <div className="brand-site corporate-site">
       <a
         className="brand-skip"
         href="#main"
@@ -42,167 +34,173 @@ export function Marketing() {
           document.getElementById('main')?.focus()
         }}
       >
-        {copy.skip}
+        {labels.skip}
       </a>
       <header className="brand-header">
         <div className="brand-header-inner brand-width">
           <Link to="/" aria-label={brand.name} className="brand-wordmark">
-            <Logo height={34} />
+            <Logo variant="full" height={42} />
           </Link>
-          <nav aria-label={copy.experience} className="brand-nav">
-            <button
-              className="brand-nav-experience"
-              onClick={() => scrollTo('experience')}
-            >
-              {copy.experience}
-            </button>
-            <DownloadAppMenu />
-            <LanguageSwitcher />
-            <Link className="brand-nav-account" to={user ? '/app' : '/login'}>
-              {t(user ? 'marketing.openApp' : 'marketing.signIn')}{' '}
-              <ArrowUpRight size={14} />
-            </Link>
+          <nav aria-label={copy.navigation} className="brand-nav corporate-nav">
+            {companyLinks.map((link) => (
+              <Link key={link.to} to={link.to}>{link.label}</Link>
+            ))}
           </nav>
+          <LanguageSwitcher />
         </div>
       </header>
       <main id="main" tabIndex={-1}>
-        <section className="brand-hero brand-width">
-          <p className="brand-eyebrow">{copy.connected}</p>
-          <h1>
-            {copy.heroFirst}
-            <br />
-            <span>{copy.heroSecond}</span>
-          </h1>
-          <p className="brand-hero-intro">{copy.intro}</p>
-          <div className="brand-actions">
-            <button className="brand-primary" onClick={explore}>
-              {t('marketing.tryDemo')} <ArrowUpRight size={16} />
-            </button>
-            <button
-              className="brand-text-link"
-              onClick={() => {
-                scrollTo('brand-film')
-                void document
-                  .querySelector<HTMLVideoElement>('#brand-film video')
-                  ?.play()
-                  .catch(() => {})
-              }}
-            >
-              {copy.watch} <Play size={14} />
-            </button>
+        <section className="corporate-hero">
+          <div className="corporate-hero-inner brand-width">
+            <div className="corporate-hero-copy">
+              <p className="brand-eyebrow">{copy.heroEyebrow}</p>
+              <h1>{copy.heroFirst}<br /><span>{copy.heroSecond}</span></h1>
+              <p className="corporate-intro">{copy.heroIntro}</p>
+              <div className="brand-actions">
+                <Link className="brand-primary" to="/partners">
+                  {copy.partnerAction} <ArrowUpRight size={17} aria-hidden="true" />
+                </Link>
+                <Link className="brand-text-link" to="/company">
+                  {copy.companyAction} <ArrowUpRight size={17} aria-hidden="true" />
+                </Link>
+              </div>
+            </div>
+            <div className="corporate-globe" aria-hidden="true">
+              <svg viewBox="0 0 520 520" fill="none">
+                <defs>
+                  <radialGradient id="corporate-globe-fill" cx="0.32" cy="0.26" r="0.78">
+                    <stop stopColor="#4bd1d3" stopOpacity="0.23" />
+                    <stop offset="1" stopColor="#0b252f" stopOpacity="0.1" />
+                  </radialGradient>
+                  <linearGradient id="corporate-orbit" x1="90" y1="120" x2="470" y2="410" gradientUnits="userSpaceOnUse">
+                    <stop stopColor="#4bd1d3" stopOpacity="0.12" />
+                    <stop offset="0.55" stopColor="#4bd1d3" />
+                    <stop offset="1" stopColor="#b9d0d6" stopOpacity="0.18" />
+                  </linearGradient>
+                </defs>
+                <circle cx="260" cy="260" r="190" fill="url(#corporate-globe-fill)" stroke="#b9d0d6" strokeOpacity="0.25" />
+                <g stroke="#b9d0d6" strokeOpacity="0.24">
+                  <ellipse cx="260" cy="260" rx="126" ry="190" />
+                  <ellipse cx="260" cy="260" rx="57" ry="190" />
+                  <ellipse cx="260" cy="260" rx="190" ry="66" />
+                  <ellipse cx="260" cy="260" rx="190" ry="135" />
+                  <path d="M70 260H450M260 70V450" />
+                </g>
+                <ellipse cx="260" cy="260" rx="246" ry="107" transform="rotate(-32 260 260)" stroke="url(#corporate-orbit)" strokeWidth="2" />
+                <g fill="#4bd1d3">
+                  <circle cx="110" cy="248" r="5" /><circle cx="379" cy="143" r="5" /><circle cx="388" cy="316" r="5" />
+                </g>
+                <g stroke="#4bd1d3" strokeOpacity="0.22">
+                  <circle cx="110" cy="248" r="13" /><circle cx="379" cy="143" r="13" /><circle cx="388" cy="316" r="13" />
+                </g>
+              </svg>
+            </div>
           </div>
         </section>
-        <BrandFilm />
-        <AppShowcase onExplore={explore} />
-        <section className="brand-rates" aria-labelledby="rates-heading">
-          <div className="brand-rates-inner brand-width">
+
+        <section className="corporate-company brand-width" aria-labelledby="company-heading">
+          <div className="corporate-company-intro">
             <div>
-              <p className="brand-eyebrow">{copy.ratesEyebrow}</p>
-              <h2 className="brand-display" id="rates-heading">
-                {copy.ratesTitle}
-              </h2>
-              <p className="brand-body">{copy.ratesBody}</p>
-              <Link to="/register" className="brand-text-link">
-                {t('marketing.getStarted')} <ArrowUpRight size={17} />
+              <p className="brand-eyebrow">{copy.companyEyebrow}</p>
+              <h2 className="brand-display" id="company-heading">{copy.companyTitle}</h2>
+            </div>
+            <div>
+              <p className="brand-body">{copy.companyBody}</p>
+              <Link className="brand-text-link" to="/company">
+                {copy.companyLink} <ArrowUpRight size={17} aria-hidden="true" />
               </Link>
             </div>
-            <RateQuote />
+          </div>
+          <dl className="corporate-facts">
+            <div><dt>{copy.factsLocation}</dt><dd>{brand.hq.city}, {brand.hq.state}</dd></div>
+            <div><dt>{copy.factsRegistration}</dt><dd><a href={brand.nmls.verifyUrl} target="_blank" rel="noopener noreferrer">NMLS ID {brand.nmls.id} <ArrowUpRight size={15} aria-hidden="true" /></a></dd></div>
+            <div><dt>{copy.factsFocus}</dt><dd>{copy.factsFocusValue}</dd></div>
+          </dl>
+        </section>
+
+        <section className="corporate-principles" aria-labelledby="approach-heading">
+          <div className="brand-width">
+            <p className="brand-eyebrow">{copy.principlesEyebrow}</p>
+            <h2 className="brand-display" id="approach-heading">{copy.principlesTitle}</h2>
+            <div className="corporate-cards">
+              {[
+                { Icon: ScanLine, title: copy.clarityTitle, body: copy.clarityBody },
+                { Icon: Languages, title: copy.accessTitle, body: copy.accessBody },
+                { Icon: ShieldCheck, title: copy.accountabilityTitle, body: copy.accountabilityBody },
+              ].map(({ Icon, title, body }) => (
+                <article key={title} className="corporate-card">
+                  <Icon size={27} strokeWidth={1.4} aria-hidden="true" />
+                  <h3>{title}</h3>
+                  <p>{body}</p>
+                </article>
+              ))}
+            </div>
           </div>
         </section>
-        <GetTheApp onExplore={explore} />
-        {/*
-          The institutional layer. A consumer skims past it; a partner, a bank's
-          onboarding team or an examiner is looking for exactly this, and its
-          absence is what made the site read as a project rather than a company.
-        */}
+
+        <section className="corporate-partners brand-width" aria-labelledby="partners-heading">
+          <div>
+            <p className="brand-eyebrow">{copy.partnerEyebrow}</p>
+            <h2 className="brand-display" id="partners-heading">{copy.partnerTitle}</h2>
+            <p className="brand-body">{copy.partnerBody}</p>
+            <div className="brand-actions">
+              <a className="brand-primary" href={`mailto:${brand.support.email}?subject=${encodeURIComponent(copy.inquirySubject)}`}>
+                {copy.inquiryAction} <ArrowUpRight size={17} aria-hidden="true" />
+              </a>
+              <Link className="brand-text-link" to="/partners">{copy.partnerLink} <ArrowUpRight size={17} aria-hidden="true" /></Link>
+            </div>
+          </div>
+          <Globe2 className="corporate-partner-icon" size={164} strokeWidth={0.6} aria-hidden="true" />
+        </section>
+
         <section className="brand-trust" aria-labelledby="trust-heading">
           <div className="brand-trust-inner brand-width">
             <div>
               <p className="brand-eyebrow">{copy.trustEyebrow}</p>
-              <h2 className="brand-display" id="trust-heading">
-                {copy.trustTitle}
-              </h2>
+              <h2 className="brand-display" id="trust-heading">{copy.trustTitle}</h2>
               <p className="brand-body">{copy.trustBody}</p>
             </div>
             <ul className="brand-trust-links">
-              {[
-                { to: '/company', label: copy.trustCompany },
-                { to: '/compliance', label: copy.trustCompliance },
-                { to: '/security', label: copy.trustSecurity },
-                { to: '/partners', label: copy.trustPartners },
-              ].map((l) => (
-                <li key={l.to}>
-                  <Link to={l.to}>
-                    {l.label}
-                    <ArrowUpRight size={16} />
-                  </Link>
-                </li>
+              {companyLinks.map((link) => (
+                <li key={link.to}><Link to={link.to}>{link.label}<ArrowUpRight size={16} aria-hidden="true" /></Link></li>
               ))}
             </ul>
           </div>
         </section>
       </main>
+
       <footer className="brand-footer brand-width">
         <div className="brand-footer-top">
           <div className="brand-footer-brand">
-            <Link to="/" aria-label={brand.name}>
-              <Logo variant="full" height={44} />
-            </Link>
+            <Link to="/" aria-label={brand.name}><Logo variant="full" height={44} /></Link>
+            <p>{brand.hq.city}, {brand.hq.state}, {brand.hq.country}</p>
             <p>
-              {brand.hq.city}, {brand.hq.state}, {brand.hq.country}
-            </p>
-            <p>
-              <a href={`mailto:${brand.support.email}`}>{brand.support.email}</a>
-              <br />
-              <a href={`tel:${brand.support.phone.replace(/[^+\d]/g, '')}`}>
-                {brand.support.phone}
-              </a>
+              <a href={`mailto:${brand.support.email}`}>{brand.support.email}</a><br />
+              <a href={`tel:${brand.support.phone.replace(/[^+\d]/g, '')}`}>{brand.support.phone}</a>
             </p>
           </div>
-          <nav className="brand-footer-columns" aria-label={copy.footerCompany}>
+          <nav className="brand-footer-columns" aria-label={labels.footerCompany}>
             <div>
-              <h2>{copy.footerCompany}</h2>
-              <Link to="/company">{copy.trustCompany}</Link>
-              <Link to="/compliance">{copy.trustCompliance}</Link>
-              <Link to="/security">{copy.trustSecurity}</Link>
-              <Link to="/partners">{copy.trustPartners}</Link>
+              <h2>{labels.footerCompany}</h2>
+              {companyLinks.map((link) => <Link key={link.to} to={link.to}>{link.label}</Link>)}
             </div>
             <div>
-              <h2>{copy.footerProduct}</h2>
-              <Link to={user ? '/app' : '/login'}>
-                {t(user ? 'marketing.openApp' : 'marketing.signIn')}
-              </Link>
-              <Link to="/register">{t('marketing.getStarted')}</Link>
-              <Link to="/support">{t('quick.support')}</Link>
+              <h2>{copy.footerContact}</h2>
+              <Link to="/support">{copy.footerContact}</Link>
+              <a href={`mailto:${brand.support.email}?subject=${encodeURIComponent(copy.inquirySubject)}`}>{copy.partnerAction}</a>
+              <Link to="/login">{t('marketing.signIn')}</Link>
             </div>
             <div>
-              <h2>{copy.footerLegal}</h2>
-              <Link to="/privacy">Privacy</Link>
-              <a href={brand.nmls.verifyUrl} target="_blank" rel="noopener noreferrer">
-                NMLS ID {brand.nmls.id}
-              </a>
+              <h2>{labels.footerLegal}</h2>
+              <Link to="/privacy">{copy.footerPrivacy}</Link>
+              <a href={brand.nmls.verifyUrl} target="_blank" rel="noopener noreferrer">NMLS ID {brand.nmls.id}</a>
             </div>
           </nav>
         </div>
-        <div className="brand-footer-bottom">
-          <p className="brand-footer-legal">
-            {/*
-              The registration, then the link that settles what it means, then
-              where the company actually stands. Stated rather than tucked into
-              a disclosure toggle: the readers this page is for establish it in
-              minutes anyway, and finding it stated is what makes the rest of
-              the page credible.
-            */}
-            {brand.legal.licence}{' '}
-            <a href={brand.nmls.verifyUrl} target="_blank" rel="noopener noreferrer">
-              Verify at NMLS Consumer Access
-            </a>
-            .
-          </p>
+        <div className="brand-footer-bottom" lang="en" dir="ltr">
+          <p className="brand-footer-legal">{brand.legal.licence}{' '}<a href={brand.nmls.verifyUrl} target="_blank" rel="noopener noreferrer">Verify at NMLS Consumer Access</a>.</p>
           <p className="brand-footer-legal">{brand.legal.operatingStatus}</p>
-          <p className="brand-footer-copyright">
-            © {new Date().getFullYear()} {brand.legalName}. All rights reserved.
-          </p>
+          <p className="brand-footer-copyright">© {new Date().getFullYear()} {brand.legalName}. All rights reserved.</p>
         </div>
       </footer>
     </div>
