@@ -93,14 +93,7 @@ export function Company() {
           { k: 'Company name', v: brand.legalName },
           { k: 'Headquarters', v: `${brand.hq.city}, ${brand.hq.state}, ${brand.hq.country}` },
           { k: 'Business focus', v: 'Cross-border payments and remittances' },
-          {
-            k: 'NMLS ID',
-            v: (
-              <a className="underline" href={brand.nmls.verifyUrl} target="_blank" rel="noopener noreferrer">
-                {brand.nmls.id} · NMLS Consumer Access
-              </a>
-            ),
-          },
+          { k: 'NMLS ID', v: brand.nmls.id },
           { k: 'Product languages', v: 'English, Somali, Spanish, Portuguese and Arabic' },
           {
             k: 'Company enquiries',
@@ -168,14 +161,6 @@ export function Compliance() {
 
       <H id="registration">Company registration</H>
       <p>{brand.legal.licence}</p>
-      <p>
-        An NMLS ID identifies a company record; it does not itself constitute a money transmitter
-        licence. Please consult{' '}
-        <a className="underline" href={brand.nmls.verifyUrl} target="_blank" rel="noopener noreferrer">
-          NMLS Consumer Access
-        </a>{' '}
-        for current state-specific licensing information.
-      </p>
 
       <H id="status">Service availability</H>
       <OperatingStatus />

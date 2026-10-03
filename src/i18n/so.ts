@@ -202,7 +202,7 @@ export const so: Record<keyof typeof en, string> = {
     'Waxaan ka dirnaa Maraykanka una dirnaa in ka badan 130 waddan, oo ay ku jiraan Soomaaliya, Kenya, Itoobiya, Jabuuti, Uganda iyo UK.',
   'help.q5': 'Lacagtaydu ma ammaan baa?',
   'help.a5':
-    '{brand} waxay ku qoran tahay Nidaamka Shatiyeynta Gobolada Badan ee Qaranka (NMLS), NMLS ID {nmls}, fadhigeeduna yahay {city}, {state}. Xaalada shatiga gobol kasta waxaa lagu daabacaa nmlsconsumeraccess.org. Dirid kastaa waa mid la sireeyay inta socdaalka ah, wax lacagna ma dhaqaaqo ilaa aad ku xaqiijiso furahaaga sirta ah.',
+    '{brand} waxay ku qoran tahay Nidaamka Shatiyeynta Gobolada Badan ee Qaranka (NMLS), NMLS ID {nmls}, fadhigeeduna yahay {city}, {state}. Dirid kastaa waa mid la sireeyay inta socdaalka ah, wax lacagna ma dhaqaaqo ilaa aad ku xaqiijiso furahaaga sirta ah.',
 
   // ---- Refer ----
   'refer.title': 'Casuun oo Kasbo',

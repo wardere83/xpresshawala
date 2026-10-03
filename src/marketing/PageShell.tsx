@@ -111,11 +111,6 @@ export function PageFooter() {
         </div>
         <div className="mt-7 border-t border-ink-200 pt-6 text-xs leading-6 text-ink-500">
           <p>{brand.legal.licence}</p>
-          <p className="mt-2">
-            <a className="underline underline-offset-4" href={brand.nmls.verifyUrl} target="_blank" rel="noopener noreferrer">
-              Verify NMLS ID {brand.nmls.id} at NMLS Consumer Access
-            </a>
-          </p>
           <p className="mt-3">{brand.legal.operatingStatus}</p>
           <p className="mt-4">© {new Date().getFullYear()} {brand.legalName}. All rights reserved.</p>
         </div>

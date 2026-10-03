@@ -285,15 +285,14 @@ test('real accounts still require a password before any transfer submission', as
   expect(writes).toEqual([])
 })
 
-test('company pages retain verifiable registration and accurate service availability', async ({ page }) => {
+test('company pages show a plain NMLS ID and accurate service availability', async ({ page }) => {
   await page.goto('/')
   await page.locator('header').getByRole('link', { name: 'Compliance', exact: true }).click()
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Compliance')
   await expect(page.getByText('NMLS ID 2900672').first()).toBeVisible()
-  await expect(page.getByRole('link', { name: /NMLS Consumer Access/ }).first()).toHaveAttribute(
-    'href',
-    'https://www.nmlsconsumeraccess.org/',
-  )
+  await expect(page.locator('a[href*="nmls" i]')).toHaveCount(0)
+  await expect(page.getByRole('link', { name: /2900672/ })).toHaveCount(0)
+  await expect(page.getByText(/Consumer Access|Verify NMLS ID|Verify at NMLS/)).toHaveCount(0)
   await expect(page.getByText(/Unverified accounts cannot create transfers/)).toBeVisible()
   await expect(page.getByText(/transaction limits linked to the account's verification tier/)).toBeVisible()
   await expect(page.getByText(/does not hold or move customer funds/).first()).toBeVisible()
@@ -306,6 +305,9 @@ test('company pages retain verifiable registration and accurate service availabi
     await page.goto(`/#/${path}`)
     await expect(page.getByRole('heading', { level: 1 })).toHaveText(heading)
     await expect(page.getByText(/NMLS ID 2900672/).first()).toBeVisible()
+    await expect(page.locator('a[href*="nmls" i]')).toHaveCount(0)
+    await expect(page.getByRole('link', { name: /2900672/ })).toHaveCount(0)
+    await expect(page.getByText(/Consumer Access|Verify NMLS ID|Verify at NMLS/)).toHaveCount(0)
   }
 })
 

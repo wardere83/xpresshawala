@@ -29,32 +29,13 @@ export const brand = {
     email: 'support@xpresstend.com',
     hours: '24/7',
   },
-  /**
-   * Nationwide Multistate Licensing System registration.
-   *
-   * An NMLS ID identifies the company's record in the system. It is not itself
-   * a licence: licences are granted state by state, and which ones have been
-   * granted is recorded against this ID. That distinction is why the copy that
-   * uses this never asserts a licence status of its own and points at Consumer
-   * Access instead. The public record is authoritative, always current, and
-   * cannot be contradicted by a stale sentence on a marketing page.
-   */
+  /** Nationwide Multistate Licensing System company identifier. */
   nmls: {
     id: '2900672',
-    /** Where anyone can verify the ID and see the live licence status. */
-    verifyUrl: 'https://www.nmlsconsumeraccess.org/',
   },
   legal: {
-    /*
-     * Deliberately states the registration rather than a licence status. If a
-     * licence is granted in a state, the NMLS record shows it the day it
-     * happens; a sentence here would have to be remembered and updated, and
-     * would be wrong in the meantime. Being wrong in either direction matters:
-     * claiming a licence you do not hold is what regulators act on, and
-     * disclaiming one you do hold costs you customers.
-     */
-    licence:
-      'XpressTend Financial Services is registered in the Nationwide Multistate Licensing System, NMLS ID 2900672. Current licence status for each state is published at nmlsconsumeraccess.org.',
+    /** Display the identifier as plain text without a verification prompt. */
+    licence: 'NMLS ID 2900672.',
     /*
      * Where the company actually is, in one sentence.
      *

@@ -200,7 +200,7 @@ export const en = {
     'We send from the USA to 130+ countries, including Somalia, Kenya, Ethiopia, Djibouti, Uganda and the UK.',
   'help.q5': 'Is my money safe?',
   'help.a5':
-    '{brand} is registered in the Nationwide Multistate Licensing System, NMLS ID {nmls}, and is based in {city}, {state}. Current licence status for each state is published at nmlsconsumeraccess.org. Every transfer is encrypted in transit, and nothing moves until you confirm it with your password.',
+    '{brand} is registered in the Nationwide Multistate Licensing System, NMLS ID {nmls}, and is based in {city}, {state}. Every transfer is encrypted in transit, and nothing moves until you confirm it with your password.',
 
   // ---- Refer ----
   'refer.title': 'Refer & Earn',
