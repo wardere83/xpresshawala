@@ -1,23 +1,25 @@
 import { useEffect } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, NavLink } from 'react-router-dom'
 import { brand } from '../config/brand'
 import { Logo } from '../components/Logo'
 
-/**
- * The formal presentation layer, shared by every page a reader arrives at to
- * assess the company rather than to send money: the policies, and the company,
- * compliance, security and partnership pages.
- *
- * These are read by people doing diligence — a bank's onboarding team, a payout
- * partner, a state examiner — so they are typeset as documents, not as landing
- * pages: one column, a contents list, and a footer that repeats the registration
- * and how to verify it on every page rather than only on the home page.
- *
- * English only, deliberately, for the same reason the policies are: a
- * mistranslated statement about licence status or fund custody carries real
- * consequence, and belongs to a qualified translator rather than to the same
- * process as interface copy.
- */
+const COMPANY_NAV = [
+  { to: '/company', label: 'Company' },
+  { to: '/partners', label: 'Partnerships' },
+  { to: '/compliance', label: 'Compliance' },
+  { to: '/security', label: 'Security' },
+]
+
+function scrollToSection(id: string) {
+  const target = document.getElementById(id)
+  if (!target) return
+  target.tabIndex = -1
+  target.focus({ preventScroll: true })
+  target.scrollIntoView({
+    behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth',
+    block: 'start',
+  })
+}
 
 export function Shell({
   title,
@@ -30,80 +32,93 @@ export function Shell({
   updated?: string
   children: React.ReactNode
 }) {
-  // Arriving from a footer link carries the landing page's scroll position
-  // along, so a document would open partway down itself.
   useEffect(() => {
+    const previousTitle = document.title
+    document.title = `${title} | ${brand.name}`
     window.scrollTo(0, 0)
-  }, [])
+    return () => { document.title = previousTitle }
+  }, [title])
 
   return (
-    <div className="min-h-dvh bg-white text-ink-900">
-      {/* Same safe-area treatment as the marketing header: the native webview
-          draws under the status bar, and the lockup must clear it. */}
+    <div lang="en" dir="ltr" className="min-h-dvh bg-white text-ink-900">
+      <a
+        className="sr-only z-50 rounded-lg bg-white p-3 text-sm font-semibold focus:not-sr-only focus:absolute focus:left-4 focus:top-4"
+        href="#company-content"
+        onClick={(event) => {
+          event.preventDefault()
+          scrollToSection('company-content')
+        }}
+      >
+        Skip to content
+      </a>
       <header className="border-b border-ink-200/70 pt-[env(safe-area-inset-top)]">
-        <div className="mx-auto flex max-w-3xl items-center justify-between gap-4 px-5 py-4">
-          {/* The full lockup: here the company is being presented formally
-              rather than the product worn casually. */}
-          <Link to="/" aria-label={brand.name}>
-            <Logo variant="full" height={40} />
+        <div className="mx-auto flex max-w-5xl flex-col gap-5 px-5 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-8">
+          <Link className="w-fit rounded-lg focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand-600" to="/" aria-label={`${brand.name} home`}>
+            <Logo variant="full" height={42} />
           </Link>
-          <nav aria-label="Company" className="flex flex-wrap gap-x-4 gap-y-1 text-[12.5px] text-ink-500">
-            <Link className="hover:text-brand-600" to="/company">Company</Link>
-            <Link className="hover:text-brand-600" to="/compliance">Compliance</Link>
-            <Link className="hover:text-brand-600" to="/security">Security</Link>
-            <Link className="hover:text-brand-600" to="/partners">Partners</Link>
+          <nav aria-label="Company" className="flex flex-wrap gap-x-1 gap-y-1 text-sm">
+            {COMPANY_NAV.map((item) => (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                className={({ isActive }) => `rounded-lg px-3 py-2 font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600 ${isActive ? 'bg-brand-50 text-brand-700' : 'text-ink-600 hover:bg-canvas hover:text-brand-700'}`}
+              >
+                {item.label}
+              </NavLink>
+            ))}
           </nav>
         </div>
       </header>
-      <main className="mx-auto max-w-3xl px-5 py-12">
-        <h1 className="text-3xl font-semibold tracking-tight">{title}</h1>
-        {intro ? <p className="mt-3 text-[15px] leading-relaxed text-ink-700">{intro}</p> : null}
-        {updated ? <p className="mt-2 text-[13px] text-ink-500">Last updated {updated}</p> : null}
-        <div className="mt-8 space-y-6 text-[14px] leading-relaxed text-ink-700">{children}</div>
+      <main id="company-content" tabIndex={-1} className="mx-auto max-w-5xl px-5 py-10 focus:outline-none sm:px-8 sm:py-14">
+        <div className="max-w-3xl border-b border-ink-200 pb-8 sm:pb-10">
+          <p className="text-xs font-semibold uppercase tracking-widest text-brand-700">{brand.legalName}</p>
+          <h1 className="mt-4 text-3xl font-semibold tracking-tight sm:text-4xl">{title}</h1>
+          {intro ? <p className="mt-5 text-base leading-relaxed text-ink-600 sm:text-lg">{intro}</p> : null}
+          {updated ? <p className="mt-4 text-sm text-ink-500">Last updated {updated}</p> : null}
+        </div>
+        <div className="mt-8 max-w-3xl space-y-6 text-[15px] leading-7 text-ink-700 sm:mt-10">{children}</div>
       </main>
       <PageFooter />
     </div>
   )
 }
 
-/**
- * The corporate footer carried by every formal page.
- *
- * The registration and the verification link appear on each one rather than
- * only on the home page, because these pages are landed on directly from a
- * search or a forwarded link as often as they are navigated to.
- */
 export function PageFooter() {
   return (
-    <footer className="border-t border-ink-200/70">
-      <div className="mx-auto max-w-3xl px-5 py-8 text-[12px] leading-relaxed text-ink-500">
-        <p className="font-semibold text-ink-700">{brand.legalName}</p>
-        <p className="mt-1">
-          {brand.hq.city}, {brand.hq.state}, {brand.hq.country}
-        </p>
-        <p className="mt-2">
-          <a className="underline" href={`mailto:${brand.support.email}`}>
-            {brand.support.email}
-          </a>
-          {' · '}
-          <a className="underline" href={`tel:${brand.support.phone.replace(/[^+\d]/g, '')}`}>
-            {brand.support.phone}
-          </a>
-        </p>
-        {/* The registration, then the link that settles what it actually
-            means. Anyone checking a money transmitter starts here. */}
-        <p className="mt-3">{brand.legal.licence}</p>
-        <p className="mt-2">
-          <a
-            className="underline"
-            href={brand.nmls.verifyUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Verify NMLS ID {brand.nmls.id} at NMLS Consumer Access
-          </a>
-        </p>
-        <p className="mt-3">{brand.legal.operatingStatus}</p>
+    <footer className="border-t border-ink-200/70 bg-canvas">
+      <div className="mx-auto max-w-5xl px-5 py-9 text-sm leading-relaxed text-ink-600 sm:px-8">
+        <div className="grid gap-7 sm:grid-cols-2">
+          <div>
+            <p className="font-semibold text-ink-900">{brand.legalName}</p>
+            <p className="mt-2">{brand.hq.city}, {brand.hq.state}, {brand.hq.country}</p>
+            <p className="mt-3">
+              <a className="underline underline-offset-4" href={`mailto:${brand.support.email}`}>
+                {brand.support.email}
+              </a>
+              <br />
+              <a className="underline underline-offset-4" href={`tel:${brand.support.phone.replace(/[^+\d]/g, '')}`}>
+                {brand.support.phone}
+              </a>
+            </p>
+          </div>
+          <nav aria-label="Company resources" className="grid grid-cols-2 content-start gap-x-4 gap-y-3">
+            {COMPANY_NAV.map((item) => (
+              <Link key={item.to} className="hover:text-brand-700 hover:underline" to={item.to}>{item.label}</Link>
+            ))}
+            <Link className="hover:text-brand-700 hover:underline" to="/privacy">Privacy policy</Link>
+            <Link className="hover:text-brand-700 hover:underline" to="/support">Contact and support</Link>
+          </nav>
+        </div>
+        <div className="mt-7 border-t border-ink-200 pt-6 text-xs leading-6 text-ink-500">
+          <p>{brand.legal.licence}</p>
+          <p className="mt-2">
+            <a className="underline underline-offset-4" href={brand.nmls.verifyUrl} target="_blank" rel="noopener noreferrer">
+              Verify NMLS ID {brand.nmls.id} at NMLS Consumer Access
+            </a>
+          </p>
+          <p className="mt-3">{brand.legal.operatingStatus}</p>
+          <p className="mt-4">© {new Date().getFullYear()} {brand.legalName}. All rights reserved.</p>
+        </div>
       </div>
     </footer>
   )
@@ -111,38 +126,34 @@ export function PageFooter() {
 
 export function H({ children, id }: { children: React.ReactNode; id?: string }) {
   return (
-    <h2 id={id} className="scroll-mt-24 pt-2 text-[17px] font-bold text-ink-900">
+    <h2 id={id} tabIndex={-1} className="scroll-mt-6 pt-3 text-xl font-semibold tracking-tight text-ink-900 focus:outline-none">
       {children}
     </h2>
   )
 }
 
-/**
- * One question and its answer. `id` gives each answer a URL, so support can
- * send someone to the exact one instead of "scroll down to Refunds".
- */
 export function Q({ q, id, children }: { q: string; id?: string; children: React.ReactNode }) {
   return (
-    <p id={id} className="scroll-mt-24">
+    <p id={id} className="scroll-mt-6 focus:outline-none">
       <strong className="text-ink-900">{q}</strong> {children}
     </p>
   )
 }
 
-/** Jump list, so a long page stays navigable without scrolling it twice. */
 export function Contents({ items }: { items: { id: string; label: string }[] }) {
   return (
-    <nav aria-label="On this page" className="rounded-xl bg-canvas p-4">
-      <p className="text-[12px] font-semibold uppercase tracking-wide text-ink-500">On this page</p>
-      <ul className="mt-2.5 grid gap-1.5 sm:grid-cols-2">
-        {items.map((i) => (
-          <li key={i.id}>
-            <a
-              className="text-[13px] underline decoration-ink-300 hover:text-brand-600"
-              href={`#${i.id}`}
+    <nav aria-label="On this page" className="rounded-2xl border border-ink-200 bg-canvas p-5">
+      <p className="text-xs font-semibold uppercase tracking-wider text-ink-500">On this page</p>
+      <ul className="mt-3 grid gap-1 sm:grid-cols-2 sm:gap-x-5">
+        {items.map((item) => (
+          <li key={item.id}>
+            <button
+              type="button"
+              className="rounded py-1 text-left text-sm text-ink-700 underline decoration-ink-300 underline-offset-4 hover:text-brand-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600"
+              onClick={() => scrollToSection(item.id)}
             >
-              {i.label}
-            </a>
+              {item.label}
+            </button>
           </li>
         ))}
       </ul>
@@ -150,17 +161,13 @@ export function Contents({ items }: { items: { id: string; label: string }[] }) 
   )
 }
 
-/**
- * A labelled fact. Diligence readers scan for these — legal name, registration,
- * jurisdiction — and a definition list is what they expect to find them in.
- */
 export function Facts({ rows }: { rows: { k: string; v: React.ReactNode }[] }) {
   return (
-    <dl className="divide-y divide-ink-200/70 overflow-hidden rounded-xl ring-1 ring-ink-200">
-      {rows.map((r) => (
-        <div key={r.k} className="grid gap-1 px-4 py-3 sm:grid-cols-[180px_1fr] sm:gap-4">
-          <dt className="text-[13px] font-semibold text-ink-900">{r.k}</dt>
-          <dd className="text-[13.5px] text-ink-700">{r.v}</dd>
+    <dl className="divide-y divide-ink-200/70 overflow-hidden rounded-2xl border border-ink-200">
+      {rows.map((row) => (
+        <div key={row.k} className="grid gap-1 px-5 py-4 sm:grid-cols-[180px_1fr] sm:gap-5">
+          <dt className="text-sm font-semibold text-ink-900">{row.k}</dt>
+          <dd className="min-w-0 break-words text-sm text-ink-700">{row.v}</dd>
         </div>
       ))}
     </dl>
