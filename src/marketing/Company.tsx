@@ -1,10 +1,53 @@
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { brand } from '../config/brand'
+import { api } from '../lib/api'
 import { Contents, Facts, H, Shell } from './PageShell'
 import { CORRIDORS as PRICED } from './pricing'
 
 const MARKETS = PRICED.map((corridor) => corridor.label).join(', ')
 const partnershipEmail = `mailto:${brand.support.email}?subject=Partnership%20enquiry`
+
+interface SanctionsReadiness {
+  ready: boolean
+  checkedAt: string | null
+}
+
+function SanctionsStatus() {
+  const [status, setStatus] = useState<SanctionsReadiness | null>(null)
+  const [unavailable, setUnavailable] = useState(false)
+
+  useEffect(() => {
+    let active = true
+    api.get<SanctionsReadiness>('/compliance/sanctions-status')
+      .then((result) => { if (active) setStatus(result) })
+      .catch(() => { if (active) setUnavailable(true) })
+    return () => { active = false }
+  }, [])
+
+  return (
+    <div className="rounded-2xl border border-ink-200 bg-canvas p-5" role="status">
+      <p className="text-xs font-semibold uppercase tracking-wider text-ink-500">
+        Official sanctions data status
+      </p>
+      <p className="mt-2 leading-relaxed text-ink-700">
+        {!status && !unavailable
+          ? 'Checking the availability of the official OFAC dataset…'
+          : status?.ready === true
+            ? 'A current official OFAC dataset is loaded for platform screening.'
+            : 'Current sanctions data availability could not be verified. Transfers require a current official dataset before they can proceed.'}
+      </p>
+      {status?.ready && status.checkedAt ? (
+        <p className="mt-2 text-sm text-ink-500">
+          Last successful source check:{' '}
+          <time dateTime={status.checkedAt}>
+            {new Date(status.checkedAt).toLocaleString('en-US', { timeZone: 'UTC' })} UTC
+          </time>
+        </p>
+      ) : null}
+    </div>
+  )
+}
 
 function OperatingStatus() {
   return (
@@ -158,11 +201,28 @@ export function Compliance() {
 
       <H id="screening">Sanctions screening</H>
       <p>
-        The platform records screening outcomes and holds potential matches for review.
-        The current screening environment uses a local evaluation list. A production sanctions
-        data provider has not yet been integrated; provider selection and validation are part of
-        partner onboarding before customer transfers can begin.
+        The platform integrates the US Treasury Office of Foreign Assets Control (OFAC)
+        Specially Designated Nationals and Blocked Persons list and consolidated non-SDN
+        sanctions lists, including listed names and aliases. Data is obtained from the official{' '}
+        <a className="underline" href="https://ofac.treasury.gov/sanctions-list-service"
+          target="_blank" rel="noopener noreferrer">
+          OFAC Sanctions List Service
+        </a>.
       </p>
+      <p>
+        Both senders and recipients are screened before transfer creation, payment processing
+        and payout release. Potential name matches are held for review by authorised compliance
+        staff. A documented false-positive decision is separate from transfer release, and an
+        unresolved match cannot be bypassed by approving a transfer.
+      </p>
+      <p>
+        Source update checks are scheduled every 15 minutes. Screening stops when the official dataset
+        is unavailable or has not been successfully checked within 24 hours. Screening records
+        retain the dataset version, matched official identifiers and staff review decisions.
+        Sanctions screening is one platform control; it does not replace licensing, customer
+        identification or other requirements applicable to a financial service.
+      </p>
+      <SanctionsStatus />
 
       <H id="records">Records and accountability</H>
       <p>
