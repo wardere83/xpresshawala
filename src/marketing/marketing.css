@@ -78,6 +78,12 @@
 .corporate-company {
   padding-block: 88px 64px;
 }
+.corporate-film {
+  padding-top: 64px;
+}
+.corporate-film .brand-film {
+  width: min(1320px, calc(100% - 96px));
+}
 .corporate-company-intro {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 0.85fr);
@@ -182,6 +188,9 @@
   color: #627780;
 }
 @media (max-width: 1000px) {
+  .corporate-film .brand-film {
+    width: calc(100% - 48px);
+  }
   .corporate-hero-inner {
     gap: 12px;
     min-height: 540px;
@@ -203,6 +212,12 @@
   }
 }
 @media (max-width: 760px) {
+  .corporate-film {
+    padding-top: 40px;
+  }
+  .corporate-film .brand-film {
+    width: calc(100% - 36px);
+  }
   .corporate-site .brand-header-inner {
     height: auto;
     padding-block: 18px 8px;
