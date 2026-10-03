@@ -55,11 +55,11 @@ test('the public homepage leads to company information and a working partnership
 
 test('keyboard users can skip the homepage navigation', async ({ page }) => {
   await page.goto('/')
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText(corporateHeadline)
   await page.keyboard.press('Tab')
   await expect(page.getByRole('link', { name: 'Skip to content', exact: true })).toBeFocused()
   await page.keyboard.press('Enter')
   await expect(page.locator('main')).toBeFocused()
-  await expect(page.getByRole('heading', { level: 1 })).toHaveText(corporateHeadline)
 })
 
 test('app feature tabs support keyboard and pointer selection and load the selected app image', async ({ page }) => {
