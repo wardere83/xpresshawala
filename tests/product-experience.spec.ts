@@ -190,10 +190,11 @@ for (const [language, explore] of [
 
     await page.locator('.corporate-hero .brand-primary').click()
     await expect(page).toHaveURL(/#\/partners$/)
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText('Partner with XpressTend')
     // Institutional and legal pages are published in English, including when
     // reached from an Arabic homepage.
-    expect(await page.locator('main').evaluate((el) => el.closest('[lang]')?.getAttribute('lang'))).toBe('en')
-    expect(await page.locator('main').evaluate((el) => getComputedStyle(el).direction)).toBe('ltr')
+    await expect(page.locator('main').locator('..')).toHaveAttribute('lang', 'en')
+    await expect(page.locator('main')).toHaveCSS('direction', 'ltr')
     await page.goto('/#/login')
     await page.getByRole('button', { name: explore, exact: true }).click()
     await expect(page).toHaveURL(/#\/app$/)
