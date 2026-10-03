@@ -100,7 +100,7 @@ export function Marketing() {
           </div>
           <dl className="corporate-facts">
             <div><dt>{copy.factsLocation}</dt><dd>{brand.hq.city}, {brand.hq.state}</dd></div>
-            <div><dt>{copy.factsRegistration}</dt><dd><a href={brand.nmls.verifyUrl} target="_blank" rel="noopener noreferrer">NMLS ID {brand.nmls.id} <ArrowUpRight size={15} aria-hidden="true" /></a></dd></div>
+            <div><dt>{copy.factsRegistration}</dt><dd>NMLS ID {brand.nmls.id}</dd></div>
             <div><dt>{copy.factsFocus}</dt><dd>{copy.factsFocusValue}</dd></div>
           </dl>
         </section>
@@ -180,12 +180,12 @@ export function Marketing() {
             <div>
               <h2>{labels.footerLegal}</h2>
               <Link to="/privacy">{copy.footerPrivacy}</Link>
-              <a href={brand.nmls.verifyUrl} target="_blank" rel="noopener noreferrer">NMLS ID {brand.nmls.id}</a>
+              <span>NMLS ID {brand.nmls.id}</span>
             </div>
           </nav>
         </div>
         <div className="brand-footer-bottom" lang="en" dir="ltr">
-          <p className="brand-footer-legal">{brand.legal.licence}{' '}<a href={brand.nmls.verifyUrl} target="_blank" rel="noopener noreferrer">Verify at NMLS Consumer Access</a>.</p>
+          <p className="brand-footer-legal">{brand.legal.licence}</p>
           <p className="brand-footer-legal">{brand.legal.operatingStatus}</p>
           <p className="brand-footer-copyright">© {new Date().getFullYear()} {brand.legalName}. All rights reserved.</p>
         </div>

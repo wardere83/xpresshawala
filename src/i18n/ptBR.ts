@@ -203,7 +203,7 @@ export const ptBR: Record<keyof typeof en, string> = {
     'Enviamos dos Estados Unidos para mais de 130 países, incluindo Somália, Quênia, Etiópia, Djibuti, Uganda e Reino Unido.',
   'help.q5': 'Meu dinheiro está seguro?',
   'help.a5':
-    'A {brand} está registrada no Nationwide Multistate Licensing System, NMLS ID {nmls}, com sede em {city}, {state}. A situação atual da licença em cada estado é publicada em nmlsconsumeraccess.org. Toda transferência é criptografada em trânsito e nada se move até você confirmar com a sua senha.',
+    'A {brand} está registrada no Nationwide Multistate Licensing System, NMLS ID {nmls}, com sede em {city}, {state}. Toda transferência é criptografada em trânsito e nada se move até você confirmar com a sua senha.',
 
   // ---- Refer ----
   'refer.title': 'Indique e ganhe',

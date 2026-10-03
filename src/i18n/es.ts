@@ -206,7 +206,7 @@ export const es: Record<keyof typeof en, string> = {
     'Enviamos desde Estados Unidos a más de 130 países, incluidos Somalia, Kenia, Etiopía, Yibuti, Uganda y el Reino Unido.',
   'help.q5': '¿Mi dinero está seguro?',
   'help.a5':
-    '{brand} está registrada en el Nationwide Multistate Licensing System, NMLS ID {nmls}, con sede en {city}, {state}. El estado actual de la licencia en cada estado se publica en nmlsconsumeraccess.org. Cada transferencia se cifra en tránsito y nada se mueve hasta que usted lo confirma con su contraseña.',
+    '{brand} está registrada en el Nationwide Multistate Licensing System, NMLS ID {nmls}, con sede en {city}, {state}. Cada transferencia se cifra en tránsito y nada se mueve hasta que usted lo confirma con su contraseña.',
 
   // ---- Refer ----
   'refer.title': 'Refiera y gane',

@@ -173,13 +173,8 @@ export function Support() {
       </p>
 
       <H id="questions">Common questions</H>
-      <Q q="Where can I verify company registration and licensing information?">
-        {brand.legal.licence} An NMLS ID identifies the company record and does not itself
-        constitute a money transmitter licence. Visit{' '}
-        <a className="underline" href={brand.nmls.verifyUrl} target="_blank" rel="noopener noreferrer">
-          NMLS Consumer Access
-        </a>{' '}
-        and search for NMLS ID {brand.nmls.id}.
+      <Q q="What is XpressTend’s NMLS number?">
+        NMLS ID {brand.nmls.id}.
       </Q>
       <Q q="How can I get help with account access?">
         Use the <Link className="underline" to="/login">sign in page</Link> to access your

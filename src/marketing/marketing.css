@@ -850,7 +850,8 @@ summary {
   text-transform: uppercase;
   color: #0b252f;
 }
-.brand-footer-columns a {
+.brand-footer-columns a,
+.brand-footer-columns > div > span {
   font-size: 13px;
   color: #627780;
   text-decoration: none;
