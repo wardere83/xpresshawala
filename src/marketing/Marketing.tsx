@@ -1,20 +1,28 @@
 import { useEffect } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { ArrowUpRight, Globe2, ShieldCheck, Languages, ScanLine } from 'lucide-react'
 import { brand } from '../config/brand'
 import { useT } from '../i18n'
 import { LanguageSwitcher } from '../components/LanguageSwitcher'
 import { Logo } from '../components/Logo'
+import { useAuth } from '../auth/AuthContext'
 import { useBrandCopy } from './brandCopy'
 import { useCorporateCopy } from './corporateCopy'
 import { InteractiveGlobe } from './InteractiveGlobe'
 import { BrandFilm } from './BrandFilm'
+import { AppShowcase } from './AppShowcase'
 import './marketing.css'
 
 export function Marketing() {
   const t = useT()
   const labels = useBrandCopy()
   const copy = useCorporateCopy()
+  const { user, enterDemo } = useAuth()
+  const navigate = useNavigate()
+  const explore = () => {
+    if (!user) enterDemo()
+    navigate('/app')
+  }
   const companyLinks = [
     { to: '/company', label: labels.trustCompany },
     { to: '/compliance', label: labels.trustCompliance },
@@ -74,6 +82,8 @@ export function Marketing() {
         <div className="corporate-film">
           <BrandFilm />
         </div>
+
+        <AppShowcase onExplore={explore} />
 
         <section className="corporate-company brand-width" aria-labelledby="company-heading">
           <div className="corporate-company-intro">

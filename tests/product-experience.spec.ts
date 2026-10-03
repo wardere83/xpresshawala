@@ -32,10 +32,10 @@ test('the public homepage leads to company information and a working partnership
   }
 
   await expect(
-    page.getByRole('button', { name: /Explore the app|Download the app|Watch the film/i }),
+    page.locator('.corporate-hero').getByRole('button', { name: /Explore the app|Download the app|Watch the film/i }),
   ).toHaveCount(0)
   await expect(
-    page.getByRole('link', { name: /Explore the app|Download the app|Watch the film/i }),
+    page.locator('.corporate-hero').getByRole('link', { name: /Explore the app|Download the app|Watch the film/i }),
   ).toHaveCount(0)
   await expect(page.getByText(/Coming soon|Concept preview|Private creative preview|\bbeta\b/i)).toHaveCount(0)
   await expect(page.locator('a[href*=".apk"], a[href*="testflight.apple.com"]')).toHaveCount(0)
@@ -62,6 +62,33 @@ test('keyboard users can skip the homepage navigation', async ({ page }) => {
   await expect(page.getByRole('heading', { level: 1 })).toHaveText(corporateHeadline)
 })
 
+test('app feature tabs support keyboard and pointer selection and load the selected app image', async ({ page }) => {
+  await page.goto('/')
+  const showcase = page.locator('#experience')
+  await showcase.getByRole('tab', { name: 'Send', exact: true }).focus()
+  await page.keyboard.press('ArrowRight')
+  await expect(showcase.getByRole('tab', { name: 'People', exact: true })).toBeFocused()
+  await expect(showcase.getByRole('tabpanel')).toContainText('Start with someone.')
+  await page.keyboard.press('End')
+  await expect(showcase.getByRole('tab', { name: 'Activity', exact: true })).toBeFocused()
+  await expect(showcase.getByRole('tabpanel')).toContainText('Follow every step.')
+
+  const image = showcase.locator('.brand-device img')
+  await image.scrollIntoViewIfNeeded()
+  await expect.poll(() => image.evaluate((element) => {
+    const screenshot = element as HTMLImageElement
+    return screenshot.complete && screenshot.naturalWidth > 0
+  })).toBe(true)
+  const activityImage = await image.evaluate((element) => (element as HTMLImageElement).currentSrc)
+
+  await showcase.getByRole('tab', { name: 'Send', exact: true }).click()
+  await expect(showcase.getByRole('tabpanel')).toContainText('A thoughtful way to send.')
+  await expect.poll(() => image.evaluate((element, previous) => {
+    const screenshot = element as HTMLImageElement
+    return screenshot.complete && screenshot.naturalWidth > 0 && screenshot.currentSrc !== previous
+  }, activityImage)).toBe(true)
+})
+
 test('explore enters the actual app, navigates, and exits to the website', async ({
   page,
 }) => {
@@ -70,10 +97,10 @@ test('explore enters the actual app, navigates, and exits to the website', async
     if (request.method() === 'POST' && /\/api\//.test(request.url()))
       writes.push(request.url())
   })
-  await page.goto('/#/login')
+  await page.goto('/')
   await page
+    .locator('#experience')
     .getByRole('button', { name: 'Explore the app', exact: true })
-    .first()
     .click()
   await expect(page).toHaveURL(/#\/app$/)
   await expect(page.getByText('Explore mode · Sample data')).toBeVisible()
