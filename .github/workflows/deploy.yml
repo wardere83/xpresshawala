@@ -66,6 +66,9 @@ jobs:
     needs: check
     runs-on: ubuntu-latest
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    concurrency:
+      group: sanctions-production
+      cancel-in-progress: false
     # Job level, not step level. A step's `if` is evaluated before that step's
     # own env block exists, so a guard on a step-scoped secret compares against
     # an empty string and the step is skipped every time — which is how the
@@ -85,6 +88,17 @@ jobs:
       - run: npm ci --prefix api
       - run: npm run build
 
+      - name: Prepare the official sanctions-data tables
+        if: env.CLOUDFLARE_API_TOKEN != ''
+        run: npx wrangler d1 execute xpresstend-production --remote --file=migrations/0007_ofac_sanctions.sql
+        working-directory: api
+
+      - name: Refresh and validate official Treasury sanctions data
+        id: sanctions-data
+        if: env.CLOUDFLARE_API_TOKEN != ''
+        run: node --experimental-strip-types scripts/refresh-sanctions.mjs --remote
+        working-directory: api
+
       # Absence is still not a failure — a fork or an unconfigured checkout
       # should build and test without trying to publish — but it says so,
       # rather than leaving a green tick to mean a deploy that never happened.
@@ -92,6 +106,37 @@ jobs:
         if: env.CLOUDFLARE_API_TOKEN != ''
         run: npx wrangler deploy
         working-directory: api
+
+      - name: Verify the deployed official sanctions dataset
+        if: env.CLOUDFLARE_API_TOKEN != ''
+        env:
+          OFAC_EXPECTED_VERSION: ${{ steps.sanctions-data.outputs.version }}
+        run: |
+          node --input-type=module <<'JS'
+          if (!process.env.OFAC_EXPECTED_VERSION) throw new Error('No validated import version was recorded.');
+          let status;
+          for (let attempt = 0; attempt < 6; attempt++) {
+            try {
+              const response = await fetch('https://xpresstend.com/api/compliance/sanctions-status', {
+                headers: { 'cache-control': 'no-cache' },
+                signal: AbortSignal.timeout(10_000),
+              });
+              const result = response.ok ? await response.json() : null;
+              if (result?.ready && result.provider === 'us-treasury-ofac' &&
+                  result.version === process.env.OFAC_EXPECTED_VERSION) {
+                status = result;
+                break;
+              }
+            } catch {
+              // Allow the new Worker a short propagation window.
+            }
+            if (attempt < 5) await new Promise(resolve => setTimeout(resolve, 5_000));
+          }
+          if (!status) throw new Error('The deployed sanctions dataset is not the validated imported version.');
+          console.log(JSON.stringify({ provider: status.provider, ready: status.ready,
+            version: status.version, entityCount: status.entityCount, nameCount: status.nameCount,
+            checkedAt: status.checkedAt }));
+          JS
 
       - name: Say why nothing was published
         if: env.CLOUDFLARE_API_TOKEN == ''

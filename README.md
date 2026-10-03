@@ -106,7 +106,10 @@ nothing. Going live needs, in this order:
 
 1. FinCEN MSB registration and money transmitter licences in every state served
 2. A licensed banking or payment partner, and payout partners per corridor
-3. A real KYC/sanctions provider wired into `kyc_checks` and `sanctions_screenings`
+3. Production customer identity verification, a validated sanctions-review process,
+   and the remaining AML programme controls. Official OFAC SDN and consolidated
+   non-SDN name and alias data are integrated into `sanctions_screenings`; see
+   [sanctions operations](docs/sanctions.md) for refresh, freshness and review controls.
 4. Replacing the test handler in `api/src/routes-transfers.ts`
 
 Until then the marketing footer says so plainly, and it should stay that way.
@@ -306,4 +309,3 @@ of what the recipient receives.
 
 React 19 · TypeScript · Vite · Tailwind CSS v4 · React Router · lucide-react. No backend —
 transfers are simulated in memory, so the app resets on reload.
-

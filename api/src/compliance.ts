@@ -1,19 +1,18 @@
-import { newId } from './crypto'
 import type { Env } from './env'
+import { audit } from './audit'
+import {
+  SanctionsUnavailableError,
+  loadFreshSanctionsDataset,
+  sanctionsScreeningStatement,
+  screenName,
+  type SanctionsDataset,
+  type ScreeningResult,
+} from './sanctions'
 
-/**
- * The compliance controls a state examiner asks about.
- *
- * A money transmitter application is judged far more on these than on the
- * payment rail: who you screened, what you refused, what you recorded, and
- * whether the limits you published are actually enforced. Everything here runs
- * on every transfer and writes a record, so the answer to "show me" is a query
- * rather than a description.
- *
- * The screening provider is a local demonstration list. It is deliberately not
- * dressed up as a real sanctions feed: an examiner should see exactly where a
- * licensed provider plugs in, not a stub pretending to be one.
- */
+export { SanctionsUnavailableError, loadFreshSanctionsDataset, screenName } from './sanctions'
+export type { SanctionsDataset, ScreeningResult } from './sanctions'
+
+/** Transaction limits and transfer-level official sanctions screening controls. */
 
 /** Aggregate ceilings by verification tier, in minor units. */
 export interface TierLimits {
@@ -31,16 +30,12 @@ export const TIER_LIMITS: Record<number, TierLimits> = {
   3: { perTransfer: 2_000_000, daily: 5_000_000, monthly: 20_000_000, dailyCount: 20 },
 }
 
-/**
- * Bank Secrecy Act thresholds, in minor units.
- *
- * 3,000 USD is where a money transmitter must record and retain sender and
- * recipient details for a transfer. 10,000 USD is where a Currency Transaction
- * Report becomes due. Both are flagged so the obligation is visible at the
- * moment it arises rather than reconstructed later.
+/** Amount-based recordkeeping and operational review flags, in USD minor units.
+ * Transfer value alone does not establish a Currency Transaction Report duty;
+ * currency transactions and applicable aggregation rules require separate review.
  */
 export const RECORDKEEPING_THRESHOLD_MINOR = 300_000
-export const CTR_THRESHOLD_MINOR = 1_000_000
+export const HIGH_VALUE_REVIEW_THRESHOLD_MINOR = 1_000_000
 
 export interface LimitDecision {
   allowed: boolean
@@ -98,69 +93,234 @@ export async function checkLimits(
   return { allowed: true }
 }
 
-/**
- * Demonstration watchlist.
- *
- * Real screening matches against OFAC SDN, consolidated EU and UN lists, and
- * PEP data, with fuzzy matching and ongoing rescreening. That is a licensed
- * data feed. These entries exist so an examiner can watch a match being raised,
- * held, and resolved by a named person.
- */
-const DEMO_WATCHLIST = [
-  'ivan petrov',
-  'omar al-baghdadi',
-  'test sanctioned person',
-]
-
-export type ScreeningStatus = 'clear' | 'potential_match' | 'confirmed_match'
-
-export interface ScreeningResult {
-  status: ScreeningStatus
-  matched?: string
-  score?: number
+export interface ScreeningSubject {
+  subjectType: 'user' | 'recipient'
+  subjectId: string
+  name: string
 }
 
-/** Case- and punctuation-insensitive containment, plus a crude token overlap. */
-export function screenName(name: string): ScreeningResult {
-  const normalised = name.toLowerCase().replace(/[^a-z\s]/g, '').replace(/\s+/g, ' ').trim()
-  for (const entry of DEMO_WATCHLIST) {
-    if (normalised === entry) return { status: 'confirmed_match', matched: entry, score: 100 }
-    const tokens = new Set(normalised.split(' '))
-    const entryTokens = entry.split(' ')
-    const overlap = entryTokens.filter((t) => tokens.has(t)).length
-    if (overlap >= 2) return { status: 'potential_match', matched: entry, score: 70 }
+export interface ScreeningSubjects {
+  sender: ScreeningSubject
+  recipient: ScreeningSubject
+  senderStatus: string
+  kycStatus: string
+  kycTier: number
+  firstName: string
+  lastName: string
+}
+
+export class ScreeningSubjectError extends Error {
+  readonly code: 'account_suspended' | 'kyc_required' | 'unknown_recipient'
+  constructor(code: 'account_suspended' | 'kyc_required' | 'unknown_recipient') {
+    super(code)
+    this.code = code
+    this.name = 'ScreeningSubjectError'
   }
-  return { status: 'clear' }
 }
 
-/** Screens a subject and records the result, whatever the outcome. */
-export async function screenAndRecord(
+export interface StoredScreening {
+  id: string
+  subject_type: 'user' | 'recipient'
+  subject_id: string
+  transfer_id: string
+  provider: string
+  status: string
+  match_json: string | null
+  cleared_by: string | null
+  cleared_at: string | null
+  created_at: string
+}
+
+export interface ScreeningEvidence extends ScreeningResult {
+  subjectName: string
+  stage?: string
+  review?: { reason: string; reviewerId: string; reviewedAt: string }
+}
+
+export function parseScreeningEvidence(value: string | null): ScreeningEvidence | null {
+  if (!value) return null
+  try {
+    const parsed = JSON.parse(value) as ScreeningEvidence
+    if (typeof parsed.subjectName !== 'string' || typeof parsed.datasetHash !== 'string' || !Array.isArray(parsed.matches)) return null
+    return parsed
+  } catch {
+    return null
+  }
+}
+
+/** A clearance is scoped to this exact subject name, snapshot and candidate set. */
+export function screeningEvidenceKey(name: string, result: ScreeningResult): string {
+  return JSON.stringify([
+    name,
+    result.datasetHash,
+    result.normalizedName,
+    result.reason ?? null,
+    result.candidateCount,
+    [...new Set(result.matches.map((match) => match.entityId))].sort(),
+  ])
+}
+
+export async function loadScreeningSubjects(env: Env, userId: string, recipientId: string): Promise<ScreeningSubjects> {
+  const [sender, recipient] = await Promise.all([
+    env.DB.prepare(
+      `SELECT id, first_name, last_name, status, kyc_status, kyc_tier FROM users WHERE id = ?`,
+    ).bind(userId).first<{ id: string; first_name: string; last_name: string; status: string; kyc_status: string; kyc_tier: number }>(),
+    env.DB.prepare(
+      `SELECT id, full_name FROM recipients WHERE id = ? AND user_id = ? AND archived_at IS NULL`,
+    ).bind(recipientId, userId).first<{ id: string; full_name: string }>(),
+  ])
+  if (!sender || sender.status !== 'active') throw new ScreeningSubjectError('account_suspended')
+  if (!recipient) throw new ScreeningSubjectError('unknown_recipient')
+  return {
+    sender: { subjectType: 'user', subjectId: sender.id, name: `${sender.first_name} ${sender.last_name}`.trim() },
+    recipient: { subjectType: 'recipient', subjectId: recipient.id, name: recipient.full_name },
+    senderStatus: sender.status,
+    kycStatus: sender.kyc_status,
+    kycTier: Number(sender.kyc_tier),
+    firstName: sender.first_name,
+    lastName: sender.last_name,
+  }
+}
+
+export function requireVerifiedSender(subjects: ScreeningSubjects): void {
+  if (subjects.kycStatus !== 'verified' || !Number.isInteger(subjects.kycTier) || subjects.kycTier < 1 || subjects.kycTier > 3) {
+    throw new ScreeningSubjectError('kyc_required')
+  }
+}
+
+export interface TransferScreeningCheck {
+  subject: ScreeningSubject
+  result: ScreeningResult
+  cleared: boolean
+  confirmed: boolean
+}
+
+export interface TransferScreening {
+  dataset: SanctionsDataset
+  subjects: ScreeningSubjects
+  checks: TransferScreeningCheck[]
+  blocked: boolean
+  confirmed: boolean
+}
+
+export async function storedTransferScreenings(env: Env, transferId: string): Promise<StoredScreening[]> {
+  const { results } = await env.DB.prepare(
+    `SELECT id, subject_type, subject_id, transfer_id, provider, status, match_json,
+            cleared_by, cleared_at, created_at
+       FROM sanctions_screenings WHERE transfer_id = ? ORDER BY created_at DESC, rowid DESC`,
+  ).bind(transferId).all<StoredScreening>()
+  return results ?? []
+}
+
+export async function screenTransferSubjects(
   env: Env,
-  args: { subjectType: 'user' | 'recipient'; subjectId: string; name: string; transferId?: string },
-): Promise<ScreeningResult> {
-  const result = screenName(args.name)
-  await env.DB.prepare(
-    `INSERT INTO sanctions_screenings
-       (id, subject_type, subject_id, transfer_id, provider, status, match_json, created_at)
-     VALUES (?, ?, ?, ?, 'demo-list', ?, ?, ?)`,
-  )
-    .bind(
-      newId('scr'),
-      args.subjectType,
-      args.subjectId,
-      args.transferId ?? null,
-      result.status,
-      JSON.stringify({ name: args.name, matched: result.matched ?? null, score: result.score ?? null }),
-      new Date().toISOString(),
-    )
-    .run()
-  return result
+  args: { userId: string; recipientId: string; transferId: string; requireVerified?: boolean },
+): Promise<TransferScreening> {
+  const subjects = await loadScreeningSubjects(env, args.userId, args.recipientId)
+  if (args.requireVerified !== false) requireVerifiedSender(subjects)
+  const dataset = await loadFreshSanctionsDataset(env)
+  const records = await storedTransferScreenings(env, args.transferId)
+  const transferConfirmed = records.some((record) => record.provider === 'us-treasury-ofac' && record.status === 'confirmed_match')
+  const checks = await Promise.all([subjects.sender, subjects.recipient].map(async (subject) => {
+    const result = await screenName(env, subject.name, dataset)
+    const relevant = records.filter((record) => record.subject_type === subject.subjectType && record.subject_id === subject.subjectId && record.provider === result.provider)
+    const confirmed = relevant.some((record) => record.status === 'confirmed_match' && parseScreeningEvidence(record.match_json)?.subjectName === subject.name)
+    const cleared = result.status === 'potential_match' && result.reason === 'name_match' && result.matches.length > 0 && relevant.some((record) => {
+      const evidence = parseScreeningEvidence(record.match_json)
+      return record.status === 'potential_match' && !!record.cleared_by && !!record.cleared_at && !!evidence?.review?.reason &&
+        evidence.review.reason.trim().length >= 20 && screeningEvidenceKey(evidence.subjectName, evidence) === screeningEvidenceKey(subject.name, result)
+    })
+    return { subject, result, cleared, confirmed }
+  }))
+  return {
+    dataset,
+    subjects,
+    checks,
+    blocked: transferConfirmed || checks.some((check) => check.confirmed || (check.result.status !== 'clear' && !check.cleared)),
+    confirmed: transferConfirmed || checks.some((check) => check.confirmed || check.result.status === 'confirmed_match'),
+  }
 }
 
-/** Reporting obligations triggered by an amount. */
+export function transferScreeningStatements(env: Env, transferId: string, screening: TransferScreening, stage: string): D1PreparedStatement[] {
+  return screening.checks.map(({ subject, result }) => sanctionsScreeningStatement(env, {
+    subjectType: subject.subjectType,
+    subjectId: subject.subjectId,
+    name: subject.name,
+    transferId,
+    stage,
+  }, result))
+}
+
+/** Repeat mutable eligibility checks in the same SQL statement that claims money. */
+export function screeningClaimGuard(screening: TransferScreening, now: string): { sql: string; values: (string | number)[] } {
+  return {
+    sql: `
+      AND EXISTS (
+        SELECT 1 FROM sanctions_active a
+        JOIN sanctions_datasets d ON d.snapshot_id = a.snapshot_id
+        WHERE a.singleton = 1 AND d.status = 'ready'
+          AND a.snapshot_id = ? AND d.content_hash = ?
+          AND a.last_success_checked_at >= ? AND a.last_success_checked_at <= ?
+      )
+      AND EXISTS (
+        SELECT 1 FROM users u WHERE u.id = transfers.user_id
+          AND u.status = 'active' AND u.kyc_status = 'verified'
+          AND u.kyc_tier BETWEEN 1 AND 3 AND u.kyc_tier = CAST(u.kyc_tier AS INTEGER)
+          AND u.first_name = ? AND u.last_name = ? AND u.kyc_tier = ?
+      )
+      AND EXISTS (
+        SELECT 1 FROM recipients r WHERE r.id = transfers.recipient_id
+          AND r.user_id = transfers.user_id AND r.archived_at IS NULL AND r.full_name = ?
+      )
+      AND NOT EXISTS (
+        SELECT 1 FROM sanctions_screenings s WHERE s.transfer_id = transfers.id
+          AND s.provider = 'us-treasury-ofac' AND s.status = 'confirmed_match'
+      )`,
+    values: [
+      screening.dataset.version,
+      screening.dataset.contentSha256,
+      new Date(new Date(now).getTime() - 24 * 3600_000).toISOString(),
+      now,
+      screening.subjects.firstName,
+      screening.subjects.lastName,
+      screening.subjects.kycTier,
+      screening.subjects.recipient.name,
+    ],
+  }
+}
+
+export function screeningFailure(error: unknown): { code: string; status: 403 | 404 | 503; message: string } | null {
+  if (error instanceof SanctionsUnavailableError) {
+    return { code: 'sanctions_unavailable', status: 503, message: 'Transfers are temporarily unavailable while sanctions screening is refreshed.' }
+  }
+  if (error instanceof ScreeningSubjectError) {
+    return { code: error.code, status: error.code === 'unknown_recipient' ? 404 : 403, message: 'The account or recipient is not eligible for this transfer.' }
+  }
+  return null
+}
+
+/** Preserve the reason for a blocked money attempt when the audit database is available. */
+export async function auditSanctionsUnavailable(
+  env: Env,
+  args: { transferId: string; stage: string; actorType: 'customer' | 'admin'; actorId: string; ip?: string },
+  error: unknown,
+): Promise<void> {
+  if (!(error instanceof SanctionsUnavailableError)) return
+  try {
+    await audit(env.DB, {
+      actorType: args.actorType, actorId: args.actorId, action: 'transfer.sanctions_unavailable',
+      entityType: 'transfer', entityId: args.transferId,
+      metadata: { stage: args.stage, reason: error.reason }, ip: args.ip,
+    })
+  } catch {
+    console.error('Sanctions-unavailable audit could not be recorded')
+  }
+}
+
+/** Reporting and operational review flags; no automatic filing assertion. */
 export function reportingFlags(amountMinor: number): string[] {
   const flags: string[] = []
   if (amountMinor >= RECORDKEEPING_THRESHOLD_MINOR) flags.push('bsa_recordkeeping')
-  if (amountMinor >= CTR_THRESHOLD_MINOR) flags.push('ctr_review')
+  if (amountMinor >= HIGH_VALUE_REVIEW_THRESHOLD_MINOR) flags.push('high_value_review')
   return flags
 }

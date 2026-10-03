@@ -8,6 +8,7 @@ import { invite } from './routes-invite'
 import { recovery } from './routes-recovery'
 import { transfers } from './routes-transfers'
 import { refreshRates } from './rates'
+import { getSanctionsStatus } from './sanctions.ts'
 
 /**
  * One Worker serves both the site and its API.
@@ -26,6 +27,12 @@ api.get('/health', async (c) => {
   const row = await c.env.DB.prepare(`SELECT COUNT(*) AS n FROM corridors WHERE enabled = 1`)
     .first<{ n: number }>()
   return c.json({ ok: true, environment: c.env.ENVIRONMENT, corridors: row?.n ?? 0 })
+})
+
+/** Dataset readiness only: no customer names or individual screening results. */
+api.get('/compliance/sanctions-status', async (c) => {
+  c.header('Cache-Control', 'no-store')
+  return c.json(await getSanctionsStatus(c.env))
 })
 
 api.route('/auth', auth)
