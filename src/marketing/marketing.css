@@ -78,12 +78,6 @@
 .corporate-company {
   padding-block: 88px 64px;
 }
-.corporate-film {
-  padding-top: 64px;
-}
-.corporate-film .brand-film {
-  width: min(1320px, calc(100% - 96px));
-}
 .corporate-company-intro {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 0.85fr);

@@ -17,45 +17,15 @@ async function waitForAnimationFrames(page: Page, count = 6) {
   }, count)
 }
 
-test('the homepage film plays silently inline and returns to the beginning of its loop', async ({ page }) => {
+test('the homepage keeps one globe without a film or visual playback controls', async ({ page }) => {
   await page.goto('/')
-  const video = page.locator('#brand-film video')
-  await video.scrollIntoViewIfNeeded()
-  await expect.poll(() => video.evaluate((element) => {
-    const film = element as HTMLVideoElement
-    return Number.isFinite(film.duration) && film.duration > 0
-  })).toBe(true)
-  expect(await video.evaluate((element) => {
-    const film = element as HTMLVideoElement
-    return { muted: film.muted, controls: film.controls, loop: film.loop, inline: film.playsInline }
-  })).toEqual({ muted: true, controls: false, loop: true, inline: true })
-
-  const startedAt = await video.evaluate((element) => (element as HTMLVideoElement).currentTime)
-  await expect.poll(() => video.evaluate((element) => (element as HTMLVideoElement).currentTime))
-    .toBeGreaterThan(startedAt + 0.15)
-
-  // Exercise the wraparound itself without waiting for the entire film.
-  await video.evaluate((element) => {
-    const film = element as HTMLVideoElement
-    film.currentTime = film.duration - 0.35
-  })
-  await expect.poll(() => video.evaluate((element) => (element as HTMLVideoElement).currentTime), {
-    timeout: 10_000,
-  }).toBeLessThan(2)
-  expect(await video.evaluate((element) => (element as HTMLVideoElement).paused)).toBe(false)
-
-  await page.getByRole('button', { name: 'Pause the XpressTend film', exact: true }).click()
-  await expect.poll(() => video.evaluate((element) => (element as HTMLVideoElement).paused)).toBe(true)
-  const pausedTime = await video.evaluate((element) => (element as HTMLVideoElement).currentTime)
-  // A visitor's explicit pause survives changes to the system preference.
-  await page.emulateMedia({ reducedMotion: 'reduce' })
-  await expect.poll(() => video.evaluate((element) => (element as HTMLVideoElement).autoplay)).toBe(false)
-  await page.emulateMedia({ reducedMotion: 'no-preference' })
-  await expect.poll(() => video.evaluate((element) => (element as HTMLVideoElement).autoplay)).toBe(true)
-  await waitForAnimationFrames(page)
-  expect(await video.evaluate((element) => (element as HTMLVideoElement).paused)).toBe(true)
-  expect(await video.evaluate((element) => (element as HTMLVideoElement).currentTime)).toBe(pausedTime)
-  await expect(page.getByRole('button', { name: 'Play the XpressTend film', exact: true })).toBeVisible()
+  const globe = page.locator('figure.xt-globe')
+  await expect(globe).toHaveCount(1)
+  await expect(globe.locator('.xt-globe-land')).toHaveAttribute('d', /^M/)
+  await expect(globe.locator('.xt-globe-arc').first()).toHaveAttribute('d', /^M/)
+  await expect(page.locator('video, #brand-film')).toHaveCount(0)
+  await expect(globe.getByRole('button')).toHaveCount(0)
+  await expect(page.getByRole('button', { name: /(?:Play|Pause) the XpressTend film/ })).toHaveCount(0)
 })
 
 test('the globe animates real land shapes and supports keyboard pause, rotation and resume', async ({ page }) => {
@@ -67,11 +37,18 @@ test('the globe animates real land shapes and supports keyboard pause, rotation 
   const initialLand = await land.getAttribute('d')
   await expect.poll(() => land.getAttribute('d')).not.toBe(initialLand)
 
-  await page.getByRole('button', { name: 'Pause globe', exact: true }).focus()
-  await page.keyboard.press('Enter')
+  await globe.getByRole('group', { name: 'Interactive globe', exact: true }).focus()
+  await page.keyboard.press('Space')
   await expect(globe).toHaveAttribute('data-paused', 'true')
   const pausedLand = await land.getAttribute('d')
   await waitForAnimationFrames(page)
+  await expect(land).toHaveAttribute('d', pausedLand!)
+
+  // An explicit keyboard pause remains in effect as system preferences change.
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+  await page.emulateMedia({ reducedMotion: 'no-preference' })
+  await waitForAnimationFrames(page)
+  await expect(globe).toHaveAttribute('data-paused', 'true')
   await expect(land).toHaveAttribute('d', pausedLand!)
 
   await globe.locator('.xt-globe-surface').focus()
@@ -88,7 +65,8 @@ test('dragging the paused globe changes its visible orientation', async ({ page 
   await page.setViewportSize({ width: 1440, height: 900 })
   await page.goto('/')
   const globe = page.locator('figure.xt-globe')
-  await page.getByRole('button', { name: 'Pause globe', exact: true }).click()
+  await globe.getByRole('group', { name: 'Interactive globe', exact: true }).focus()
+  await page.keyboard.press('Space')
   await expect(globe).toHaveAttribute('data-paused', 'true')
   const land = globe.locator('.xt-globe-land').first()
   await expect(land).toHaveAttribute('d', /^M/)
@@ -106,7 +84,7 @@ test('dragging the paused globe changes its visible orientation', async ({ page 
   await expect(globe).toHaveAttribute('data-paused', 'true')
 })
 
-test('reduced motion waits for deliberate film and globe playback', async ({ page }) => {
+test('reduced motion holds the globe until deliberate keyboard playback', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' })
   await page.setViewportSize({ width: 1440, height: 900 })
   await page.goto('/')
@@ -118,18 +96,8 @@ test('reduced motion waits for deliberate film and globe playback', async ({ pag
   await waitForAnimationFrames(page)
   await expect(land).toHaveAttribute('d', initialLand!)
 
-  const video = page.locator('#brand-film video')
-  await video.scrollIntoViewIfNeeded()
-  expect(await video.evaluate((element) => {
-    const film = element as HTMLVideoElement
-    return { autoplay: film.autoplay, paused: film.paused, time: film.currentTime }
-  })).toEqual({ autoplay: false, paused: true, time: 0 })
-  await page.getByRole('button', { name: 'Play the XpressTend film', exact: true }).click()
-  await expect.poll(() => video.evaluate((element) => (element as HTMLVideoElement).currentTime))
-    .toBeGreaterThan(0.15)
-
-  await globe.scrollIntoViewIfNeeded()
-  await page.getByRole('button', { name: 'Resume globe', exact: true }).click()
+  await globe.getByRole('group', { name: 'Interactive globe', exact: true }).focus()
+  await page.keyboard.press('Space')
   await expect(globe).toHaveAttribute('data-paused', 'false')
   await expect.poll(() => land.getAttribute('d')).not.toBe(initialLand)
 })
