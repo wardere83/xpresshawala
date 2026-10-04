@@ -9,7 +9,6 @@ import { useAuth } from '../auth/AuthContext'
 import { useBrandCopy } from './brandCopy'
 import { useCorporateCopy } from './corporateCopy'
 import { InteractiveGlobe } from './InteractiveGlobe'
-import { BrandFilm } from './BrandFilm'
 import { AppShowcase } from './AppShowcase'
 import './marketing.css'
 
@@ -66,22 +65,10 @@ export function Marketing() {
               <p className="brand-eyebrow">{copy.heroEyebrow}</p>
               <h1>{copy.heroFirst}<br /><span>{copy.heroSecond}</span></h1>
               <p className="corporate-intro">{copy.heroIntro}</p>
-              <div className="brand-actions">
-                <Link className="brand-primary" to="/partners">
-                  {copy.partnerAction} <ArrowUpRight size={17} aria-hidden="true" />
-                </Link>
-                <Link className="brand-text-link" to="/company">
-                  {copy.companyAction} <ArrowUpRight size={17} aria-hidden="true" />
-                </Link>
-              </div>
             </div>
             <InteractiveGlobe />
           </div>
         </section>
-
-        <div className="corporate-film">
-          <BrandFilm />
-        </div>
 
         <AppShowcase onExplore={explore} />
 
@@ -174,7 +161,6 @@ export function Marketing() {
             <div>
               <h2>{copy.footerContact}</h2>
               <Link to="/support">{copy.footerContact}</Link>
-              <a href={`mailto:${brand.support.email}?subject=${encodeURIComponent(copy.inquirySubject)}`}>{copy.partnerAction}</a>
               <Link to="/login">{t('marketing.signIn')}</Link>
             </div>
             <div>

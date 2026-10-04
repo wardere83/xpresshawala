@@ -1,45 +1,34 @@
 import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react'
 import { geoGraticule10, geoInterpolate, geoOrthographic, geoPath } from 'd3-geo'
-import { Pause, Play } from 'lucide-react'
 import { useI18n, type Lang } from '../i18n'
 import land from './globeLand.json'
 import './globe.css'
 
-const UI: Record<Lang, { title: string; instructions: string; hint: string; pause: string; resume: string }> = {
+const UI: Record<Lang, { title: string; instructions: string; hint: string }> = {
   en: {
     title: 'Interactive globe',
     instructions: 'Drag to explore the globe, or use the left and right arrow keys to rotate. Press Space to pause or resume. Connections illustrate cross-border payments, not current service availability.',
     hint: 'Drag to explore',
-    pause: 'Pause globe',
-    resume: 'Resume globe',
   },
   so: {
     title: 'Duni aad dhaqaajin karto',
     instructions: 'Jiid si aad dunida u sahamiso, ama isticmaal fallaaraha bidix iyo midig si aad u rogto. Riix Space si aad u hakiso ama u sii waddo. Xiriirradu waxay tusaale u yihiin lacag-bixinta xuduudaha ka gudubta; ma muujinayaan helitaanka adeegga hadda.',
     hint: 'Jiid si aad u sahamiso',
-    pause: 'Haki dunida',
-    resume: 'Sii wad dunida',
   },
   es: {
     title: 'Globo interactivo',
     instructions: 'Arrastre para explorar el globo o use las flechas izquierda y derecha para girarlo. Pulse Espacio para pausar o reanudar. Las conexiones ilustran pagos transfronterizos, no la disponibilidad actual del servicio.',
     hint: 'Arrastre para explorar',
-    pause: 'Pausar el globo',
-    resume: 'Reanudar el globo',
   },
   'pt-BR': {
     title: 'Globo interativo',
     instructions: 'Arraste para explorar o globo ou use as setas esquerda e direita para girar. Pressione Espaço para pausar ou retomar. As conexões ilustram pagamentos internacionais, não a disponibilidade atual do serviço.',
     hint: 'Arraste para explorar',
-    pause: 'Pausar o globo',
-    resume: 'Retomar o globo',
   },
   ar: {
     title: 'كرة أرضية تفاعلية',
     instructions: 'اسحب لاستكشاف الكرة الأرضية، أو استخدم سهمي اليسار واليمين لتدويرها. اضغط مفتاح المسافة للإيقاف المؤقت أو الاستئناف. توضح الروابط فكرة المدفوعات عبر الحدود ولا تشير إلى توفر الخدمة حالياً.',
     hint: 'اسحب للاستكشاف',
-    pause: 'إيقاف الكرة الأرضية مؤقتاً',
-    resume: 'استئناف حركة الكرة الأرضية',
   },
 }
 
@@ -314,17 +303,19 @@ export function InteractiveGlobe() {
           <g className="xt-globe-particles">
             {projectedRoutes.map(({ particle }, index) => particle.visible && (
               <g key={index}>
-                <circle cx={particle.x} cy={particle.y} r="5" fill="#7cfcff" opacity="0.65" filter={`url(#${ids.glow})`} />
+                <circle cx={particle.x} cy={particle.y} r="5" fill="#7cfcff" opacity="0.4" filter={`url(#${ids.glow})`} />
                 <circle className="xt-globe-particle" cx={particle.x} cy={particle.y} r="2" fill="#f0ffff" />
               </g>
             ))}
           </g>
+          <g className="xt-globe-intro">
+            <path className="xt-globe-intro-line" d={`M${CENTER},6 V${CENTER - RADIUS}`} pathLength="1" />
+            <g className="xt-globe-intro-tip">
+              <circle cx={CENTER} cy={CENTER - RADIUS} r="12" fill="#69cbd1" opacity="0.1" filter={`url(#${ids.glow})`} />
+              <circle cx={CENTER} cy={CENTER - RADIUS} r="1.7" fill="#9adce0" opacity="0.65" />
+            </g>
+          </g>
         </svg>
-      </div>
-      <div className="xt-globe-controls">
-        <button type="button" className="xt-globe-toggle" onClick={() => setPaused((current) => !current)} aria-pressed={paused} aria-label={paused ? copy.resume : copy.pause}>
-          {paused ? <Play size={13} fill="currentColor" aria-hidden="true" /> : <Pause size={13} aria-hidden="true" />}
-        </button>
       </div>
       <p className="xt-globe-hint">{copy.hint}</p>
       <p className="sr-only" id={ids.instructions}>{copy.instructions}</p>

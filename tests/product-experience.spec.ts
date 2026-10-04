@@ -40,11 +40,12 @@ test('the public homepage leads to company information and a working partnership
   await expect(page.getByText(/Coming soon|Concept preview|Private creative preview|\bbeta\b/i)).toHaveCount(0)
   await expect(page.locator('a[href*=".apk"], a[href*="testflight.apple.com"]')).toHaveCount(0)
 
-  await page.getByRole('link', { name: 'Discover XpressTend', exact: true }).click()
+  await expect(page.locator('.corporate-hero').getByRole('link', { name: /Discuss a partnership|Discover XpressTend/ })).toHaveCount(0)
+  await page.locator('header').getByRole('link', { name: 'Company', exact: true }).click()
   await expect(page).toHaveURL(/#\/company$/)
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('About XpressTend')
   await page.goto('/')
-  await page.locator('main').getByRole('link', { name: 'Discuss a partnership', exact: true }).click()
+  await page.locator('header').getByRole('link', { name: 'Partnerships', exact: true }).click()
   await expect(page).toHaveURL(/#\/partners$/)
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Partner with XpressTend')
   await expect(
@@ -180,7 +181,8 @@ for (const width of [320, 390, 768, 1440]) {
   test(`public pages, navigation and app fit a ${width}px viewport`, async ({ page }) => {
     await page.setViewportSize({ width, height: 900 })
     await page.goto('/')
-    await expect(page.locator('main').getByRole('link', { name: 'Discuss a partnership', exact: true })).toBeVisible()
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText(corporateHeadline)
+    await expect(page.locator('header').getByRole('link', { name: 'Partnerships', exact: true })).toBeVisible()
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width)
 
     for (const [name, path] of [['Company', 'company'], ['Partnerships', 'partners']]) {
@@ -215,7 +217,7 @@ for (const [language, explore] of [
     await expect(page.getByRole('heading', { level: 1 })).not.toHaveText(corporateHeadline)
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390)
 
-    await page.locator('.corporate-hero .brand-primary').click()
+    await page.locator('header a[href="#/partners"]').click()
     await expect(page).toHaveURL(/#\/partners$/)
     await expect(page.getByRole('heading', { level: 1 })).toHaveText('Partner with XpressTend')
     // Institutional and legal pages are published in English, including when

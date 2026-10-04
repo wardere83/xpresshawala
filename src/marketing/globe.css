@@ -54,24 +54,55 @@
 .xt-globe-arc {
   stroke: #a6fbff;
   stroke-width: 1.3px;
-  stroke-opacity: 0.8;
+  stroke-opacity: 0.65;
   stroke-linecap: round;
 }
 
 .xt-globe-arc-glow {
   stroke: #57e1e6;
   stroke-width: 3.5px;
-  stroke-opacity: 0.28;
+  stroke-opacity: 0.16;
 }
 
-.xt-globe-controls {
-  position: relative;
-  z-index: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-top: -30px;
-  padding-inline: 12px;
+.xt-globe-intro {
+  pointer-events: none;
+  opacity: 0;
+  animation: xt-globe-light-entry 2.8s ease-out both;
+}
+
+.xt-globe-intro-line {
+  stroke: #69cbd1;
+  stroke-width: 0.8px;
+  stroke-opacity: 0.5;
+  stroke-linecap: round;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: xt-globe-line-entry 1.7s ease-out both;
+}
+
+.xt-globe-intro-tip {
+  animation: xt-globe-tip-entry 1.7s ease-out both;
+}
+
+.xt-globe[data-paused="true"] .xt-globe-intro,
+.xt-globe[data-paused="true"] .xt-globe-intro-line,
+.xt-globe[data-paused="true"] .xt-globe-intro-tip {
+  animation-play-state: paused;
+}
+
+@keyframes xt-globe-light-entry {
+  0%, 100% { opacity: 0; }
+  12%, 65% { opacity: 1; }
+}
+
+@keyframes xt-globe-line-entry {
+  from { stroke-dashoffset: 1; }
+  to { stroke-dashoffset: 0; }
+}
+
+@keyframes xt-globe-tip-entry {
+  from { transform: translateY(-64px); }
+  to { transform: translateY(0); }
 }
 
 .xt-globe-hint {
@@ -81,52 +112,21 @@
   text-align: center;
 }
 
-.xt-globe-toggle {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 44px;
-  min-height: 44px;
-  padding: 8px 10px;
-  border: 1px solid #78d6dd30;
-  border-radius: 24px;
-  color: #d9f0f2;
-  font-size: 11px;
-  white-space: nowrap;
-  cursor: pointer;
-  background: #17374370;
-  transition: border-color 160ms, background 160ms;
-}
-
-.corporate-globe .xt-globe-toggle svg {
-  flex: none;
-  width: 13px;
-  height: 13px;
-}
-
-.xt-globe-toggle:hover {
-  background: #1d4855;
-  border-color: #78d6dd70;
-}
-
-.xt-globe-toggle:focus-visible {
-  outline: 2px solid #6ce8eb;
-  outline-offset: 3px;
-}
-
 @media (max-width: 760px) {
   .corporate-globe.xt-globe {
     width: min(100%, 340px);
     margin-block: 8px 18px;
   }
-
-  .xt-globe-controls {
-    margin-top: -15px;
-  }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .xt-globe-toggle {
-    transition: none;
+  .xt-globe-intro {
+    display: none;
+    animation: none;
+  }
+
+  .xt-globe-intro-line,
+  .xt-globe-intro-tip {
+    animation: none;
   }
 }
