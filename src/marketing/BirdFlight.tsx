@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import './bird.css'
 
 type Point = { x: number; y: number }
@@ -21,7 +21,7 @@ function lastLetter(heading: HTMLElement): { range: Range; letter: string } | nu
   return null
 }
 
-function flightFrames(flight: Flight): Keyframe[] {
+function flightFrames(flight: Flight, initialTilt = 0, initialOpacity = 0.1): Keyframe[] {
   const { start, end } = flight
   const direction = start.x > end.x ? -1 : 1
   const distance = Math.hypot(end.x - start.x, end.y - start.y)
@@ -34,9 +34,9 @@ function flightFrames(flight: Flight): Keyframe[] {
     const x = u ** 3 * start.x + 3 * u ** 2 * t * first.x + 3 * u * t ** 2 * second.x + t ** 3 * end.x
     const y = u ** 3 * start.y + 3 * u ** 2 * t * first.y + 3 * u * t ** 2 * second.y + t ** 3 * end.y
     // The bird levels out as it approaches its perch.
-    const tilt = Math.sin(t * Math.PI) * direction * 10
+    const tilt = Math.sin(t * Math.PI) * direction * 10 + initialTilt * u ** 2
     return { offset: t, transform: `translate(${x}px, ${y}px) rotate(${tilt}deg)`,
-      opacity: Math.min(1, t * 12 + 0.1) }
+      opacity: Math.min(1, t * 12 + initialOpacity) }
   })
 }
 
@@ -45,6 +45,10 @@ export function BirdFlight({ title }: { title: string }) {
   const ref = useRef<SVGSVGElement>(null)
   const traveller = useRef<SVGGElement>(null)
   const flown = useRef(false)
+  const latestFlight = useRef<Flight | null>(null)
+  const animation = useRef<Animation | null>(null)
+  const positionBeforeGeometry = useRef<Point | null>(null)
+  const retarget = useRef<(() => void) | null>(null)
   const [flight, setFlight] = useState<Flight | null>(null)
   const [phase, setPhase] = useState<Phase>('waiting')
   const [active, setActive] = useState(false)
@@ -75,6 +79,13 @@ export function BirdFlight({ title }: { title: string }) {
       const start = { x: center.x + (end.x - center.x) / distance * source.width * 0.41,
         y: center.y + (end.y - center.y) / distance * source.height * 0.41 }
       const next = { width: box.width, height: box.height, start, end, letter: anchor.letter }
+      if (JSON.stringify(latestFlight.current) === JSON.stringify(next)) return
+      // Preserve the visible point before React changes the overlay viewBox.
+      const matrix = animation.current && traveller.current?.getScreenCTM()
+      if (matrix) {
+        const point = new DOMPoint(0, 0).matrixTransform(matrix)
+        positionBeforeGeometry.current = { x: point.x, y: point.y }
+      }
       setFlight((previous) => JSON.stringify(previous) === JSON.stringify(next) ? previous : next)
     }
     const observer = new ResizeObserver(measure)
@@ -83,34 +94,64 @@ export function BirdFlight({ title }: { title: string }) {
     observer.observe(river)
     measure()
     void document.fonts.ready.then(measure)
-    return () => { disposed = true; observer.disconnect() }
+    document.fonts.addEventListener('loadingdone', measure)
+    return () => { disposed = true; observer.disconnect(); document.fonts.removeEventListener('loadingdone', measure) }
   }, [title])
 
+  useLayoutEffect(() => {
+    latestFlight.current = flight
+    retarget.current?.()
+  }, [flight])
+
+  const ready = flight !== null
   useEffect(() => {
     const element = traveller.current
     const section = ref.current?.closest<HTMLElement>('.corporate-partners')
-    if (!element || !section || !flight) return
+    if (!element || !section || !ready) return
     const motion = window.matchMedia('(prefers-reduced-motion: reduce)')
     let visible = false
-    let animation: Animation | null = null
-    const perch = () => { flown.current = true; animation?.cancel(); animation = null; setPhase('perched') }
+    const cancel = () => {
+      if (animation.current) { animation.current.onfinish = null; animation.current.cancel() }
+      animation.current = null
+    }
+    const perch = () => { flown.current = true; cancel(); positionBeforeGeometry.current = null; setPhase('perched') }
+    const fly = (geometry: Flight, duration: number, initialTilt = 0, initialOpacity = 0.1) => {
+      cancel()
+      const current = element.animate(flightFrames(geometry, initialTilt, initialOpacity), {
+        duration, easing: 'cubic-bezier(.25,.1,.3,1)', fill: 'forwards',
+      })
+      animation.current = current
+      current.onfinish = () => { if (animation.current === current) perch() }
+      if (!visible || document.visibilityState !== 'visible') current.pause()
+    }
+    retarget.current = () => {
+      const current = animation.current
+      const geometry = latestFlight.current
+      const overlayMatrix = ref.current?.getScreenCTM()
+      const travellerMatrix = element.getScreenCTM()
+      if (!current || !geometry || !overlayMatrix || !travellerMatrix) return
+      const screen = positionBeforeGeometry.current ?? new DOMPoint(0, 0).matrixTransform(travellerMatrix)
+      positionBeforeGeometry.current = null
+      const point = new DOMPoint(screen.x, screen.y).matrixTransform(overlayMatrix.inverse())
+      const style = getComputedStyle(element)
+      const matrix = new DOMMatrix(style.transform)
+      const tilt = Math.atan2(matrix.b, matrix.a) * 180 / Math.PI
+      const remaining = Number(current.effect?.getTiming().duration) - Number(current.currentTime ?? 0)
+      if (!(remaining > 0)) { perch(); return }
+      fly({ ...geometry, start: { x: point.x, y: point.y } }, remaining, tilt, Number(style.opacity))
+    }
     const update = () => {
       const running = visible && document.visibilityState === 'visible'
       setActive(running)
       if (motion.matches) { perch(); return }
-      if (!flown.current && running) {
-        flown.current = true
+      const geometry = latestFlight.current
+      if (!flown.current && !animation.current && running && geometry) {
         setPhase('flying')
-        const distance = Math.hypot(flight.end.x - flight.start.x, flight.end.y - flight.start.y)
-        animation = element.animate(flightFrames(flight), {
-          duration: Math.min(6000, Math.max(3800, 2400 + distance * 6)),
-          easing: 'cubic-bezier(.25,.1,.3,1)',
-          fill: 'forwards',
-        })
-        animation.onfinish = () => { animation?.cancel(); animation = null; setPhase('perched') }
-      } else if (animation) {
-        if (running) animation.play()
-        else animation.pause()
+        const distance = Math.hypot(geometry.end.x - geometry.start.x, geometry.end.y - geometry.start.y)
+        fly(geometry, Math.min(6000, Math.max(3800, 2400 + distance * 6)))
+      } else if (animation.current) {
+        if (running) animation.current.play()
+        else animation.current.pause()
       }
     }
     if (flown.current || motion.matches) perch()
@@ -125,9 +166,10 @@ export function BirdFlight({ title }: { title: string }) {
       observer.disconnect()
       document.removeEventListener('visibilitychange', update)
       motion.removeEventListener('change', update)
-      animation?.cancel()
+      retarget.current = null
+      cancel()
     }
-  }, [flight])
+  }, [ready])
 
   const position = flight && (phase === 'waiting' ? flight.start : flight.end)
   const facing = flight && flight.start.x < flight.end.x ? -1 : 1
