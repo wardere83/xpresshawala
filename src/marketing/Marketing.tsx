@@ -11,6 +11,7 @@ import { useCorporateCopy } from './corporateCopy'
 import { InteractiveGlobe } from './InteractiveGlobe'
 import { AppShowcase } from './AppShowcase'
 import { RiverFlow } from './RiverFlow'
+import { BirdFlight } from './BirdFlight'
 import './marketing.css'
 
 export function Marketing() {
@@ -126,6 +127,7 @@ export function Marketing() {
             </div>
           </div>
           <RiverFlow />
+          <BirdFlight title={copy.partnerTitle} />
         </section>
 
         <section className="brand-trust" aria-labelledby="trust-heading">

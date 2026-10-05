@@ -18,7 +18,13 @@ if ! "$BUILD_TOOLS/apksigner" verify --verbose --print-certs "$APK" > "$CHECK_DI
   echo '::error::APK cryptographic signature verification failed.'
   exit 1
 fi
-ACTUAL_CERT=$(sed -n 's/^Signer #1 certificate SHA-256 digest: //p' "$CHECK_DIR/apk-signature")
+# Android 17 tools prefix labels with V2/V3.0/V3.1; rotated signers add SDK ranges.
+# Accept these labels, but require one complete app signer fingerprint before pinning.
+ACTUAL_CERT=$(sed -nE 's/^[[:space:]]*((V1|V2|V3\.0|V3\.1)[[:space:]]+)?Signer[^[:cntrl:]]* certificate SHA-256 digest:[[:space:]]*([^[:space:]]+)[[:space:]]*$/\3/p' "$CHECK_DIR/apk-signature" | tr '[:upper:]' '[:lower:]')
+if [[ ! "$ACTUAL_CERT" =~ ^[0-9a-f]{64}$ ]]; then
+  echo '::error::Could not identify exactly one valid APK signer certificate fingerprint.'
+  exit 1
+fi
 echo "APK signing certificate SHA-256: $ACTUAL_CERT"
 test "$ACTUAL_CERT" = "$EXPECTED_CERT" || { echo '::error::The APK signer differs from the existing XpressTend upload certificate.'; exit 1; }
 "$BUILD_TOOLS/aapt" dump badging "$APK" > "$CHECK_DIR/apk-metadata"
@@ -35,7 +41,11 @@ fi
 # are inappropriate here. Require verified integrity and the pinned certificate.
 jarsigner -J-Duser.language=en -verify "$AAB" > "$CHECK_DIR/bundle-signature" 2>&1
 grep -Fq 'jar verified.' "$CHECK_DIR/bundle-signature"
-if grep -Eiq 'unsigned|not signed|weak|disabled algorithm' "$CHECK_DIR/bundle-signature"; then
+# Gradle places the manifest late in the ZIP. JDK reports those entries as signed
+# in JarFile but unreadable as signed by JarInputStream; this is an entry-order
+# warning, not unsigned payload. Exclude only that exact warning line.
+sed '/^- Entry .* is signed in JarFile but is not signed in JarInputStream$/d' "$CHECK_DIR/bundle-signature" > "$CHECK_DIR/bundle-warning-check"
+if grep -Eiq 'unsigned|not signed|weak|disabled algorithm' "$CHECK_DIR/bundle-warning-check"; then
   echo '::error::App Bundle contains unsigned content or weak signing algorithms.'
   exit 1
 fi

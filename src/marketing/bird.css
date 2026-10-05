@@ -1,0 +1,59 @@
+.corporate-partners {
+  position: relative;
+  isolation: isolate;
+}
+.xt-bird {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+  z-index: 1;
+}
+.xt-bird-traveller {
+  transform-origin: 0 0;
+}
+.xt-bird[data-phase='waiting'] .xt-bird-traveller {
+  opacity: 0;
+}
+.xt-bird-body {
+  fill: #d6eee9;
+}
+.xt-bird-beak {
+  fill: #79d6d4;
+}
+.xt-bird-folded-wing,
+.xt-bird-flight-wing {
+  fill: #6aabae;
+}
+.xt-bird-feet {
+  fill: none;
+  stroke: #a6d4cf;
+  stroke-width: 1;
+  stroke-linecap: round;
+}
+.xt-bird-eye {
+  fill: #0b252f;
+}
+.xt-bird-flight-wing {
+  display: none;
+  transform-origin: 2px -10px;
+}
+.xt-bird[data-phase='flying'] .xt-bird-flight-wing {
+  display: block;
+  animation: xt-bird-wing 0.44s ease-in-out infinite alternate;
+}
+.xt-bird[data-phase='flying'] .xt-bird-folded-wing {
+  display: none;
+}
+.xt-bird[data-active='false'] .xt-bird-flight-wing {
+  animation-play-state: paused;
+}
+@keyframes xt-bird-wing {
+  from { transform: rotate(-28deg) scaleY(0.5); }
+  to { transform: rotate(27deg) scaleY(1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .xt-bird .xt-bird-flight-wing { animation: none; }
+}
