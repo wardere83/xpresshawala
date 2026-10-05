@@ -27,11 +27,11 @@ before(async () => {
 })
 after(async () => { if (directory) await rm(directory, { recursive: true, force: true }) })
 
-async function setup(t: TestContext, options: { emailEnabled?: boolean } = {}) {
+async function setup(t: TestContext, options: { emailEnabled?: boolean; senderName?: string } = {}) {
   const db = new SqliteD1()
   t.after(() => db.close())
   seedDataset(db)
-  const sessions = await seedParties(db)
+  const sessions = await seedParties(db, { senderName: options.senderName })
   const env = { ...fixtureEnv(db), ...(options.emailEnabled === false ? {} : { RESEND_API_KEY: 'isolated-test-key' }) }
   const emails: { to: string[]; text: string }[] = []
   t.mock.method(globalThis, 'fetch', async (input: string | URL | Request, init?: RequestInit) => {
@@ -423,6 +423,62 @@ test('revoking a customer session before the funding claim prevents any monetary
   assert.equal(f.db.sqlite.prepare('SELECT paid_at FROM transfers').get()!.paid_at, null)
   assert.equal(f.db.sqlite.prepare('SELECT COUNT(*) AS n FROM ledger_entries').get()!.n, 0)
   assert.equal(f.db.sqlite.prepare('SELECT COUNT(*) AS n FROM transfer_postings').get()!.n, 0)
+})
+
+async function verifyPaymentLosesToDeletion(f: Awaited<ReturnType<typeof setup>>, id: string) {
+  let injected = false
+  let recordsAfterDeletion: unknown
+  const records = () => ({
+    screenings: f.db.sqlite.prepare('SELECT * FROM sanctions_screenings ORDER BY id').all(),
+    events: f.db.sqlite.prepare('SELECT * FROM transfer_events ORDER BY id').all(),
+    audit: f.db.sqlite.prepare('SELECT * FROM audit_log ORDER BY id').all(),
+  })
+  const originalBatch = f.db.batch.bind(f.db)
+  f.db.batch = async (statements) => {
+    if (statements.some((statement) => statement.sql.startsWith("UPDATE transfers SET status = 'compliance_hold'"))) {
+      // The payment has read and screened the active account, but its write
+      // transaction has not started. Complete a real deletion in this window.
+      f.db.batch = originalBatch
+      injected = true
+      assert.equal((await f.erase()).status, 200)
+      recordsAfterDeletion = records()
+    }
+    return originalBatch(statements)
+  }
+  const response = await f.request(`/transfers/${id}/pay`, { body: { password: f.sessions.password } })
+  assert.ok(injected)
+  assert.equal(response.status, 409)
+  assert.equal(response.body.error, 'screening_changed')
+  assert.equal(f.db.sqlite.prepare('SELECT status FROM users').get()!.status, 'closed')
+  assert.equal(f.db.sqlite.prepare('SELECT status FROM transfers WHERE id=?').get(id)!.status, 'cancelled')
+  assert.deepEqual(records(), recordsAfterDeletion)
+  assert.equal(f.db.sqlite.prepare('SELECT COUNT(*) AS n FROM ledger_entries').get()!.n, 0)
+  assert.equal(f.db.sqlite.prepare('SELECT COUNT(*) AS n FROM transfer_postings').get()!.n, 0)
+}
+
+test('a blocked sanctions payment cannot write screening or hold records after concurrent account deletion', async (t) => {
+  const f = await setup(t, { senderName: 'Ivan Sergeyevich Petrov' })
+  const created = await f.create()
+  assert.equal(created.status, 200)
+  const id = created.body.transfer.id
+  assert.equal(created.body.transfer.status, 'compliance_hold')
+  const heldRecords = () => ({
+    events: f.db.sqlite.prepare("SELECT COUNT(*) AS n FROM transfer_events WHERE note='Sanctions review required before payment'").get()!.n,
+    audit: f.db.sqlite.prepare("SELECT COUNT(*) AS n FROM audit_log WHERE action='transfer.sanctions_hold'").get()!.n,
+  })
+  assert.equal((await f.request(`/transfers/${id}/pay`, { body: { password: f.sessions.password } })).status, 403)
+  const alreadyHeld = heldRecords()
+  assert.equal((await f.request(`/transfers/${id}/pay`, { body: { password: f.sessions.password } })).status, 403)
+  assert.deepEqual(heldRecords(), alreadyHeld, 'an already-held retry adds no duplicate hold event or audit')
+  await verifyPaymentLosesToDeletion(f, id)
+})
+
+test('a clear sanctions payment cannot add screening or funding records after concurrent account deletion', async (t) => {
+  const f = await setup(t)
+  const created = await f.create()
+  assert.equal(created.status, 200)
+  assert.equal(created.body.transfer.status, 'awaiting_payment')
+  await verifyPaymentLosesToDeletion(f, created.body.transfer.id)
 })
 
 test('staff cannot verify closed accounts or write invalid verification tiers', async (t) => {

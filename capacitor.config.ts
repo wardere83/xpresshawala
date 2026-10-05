@@ -23,6 +23,8 @@ const config: CapacitorConfig = {
     // https rather than the legacy http scheme, so the webview is a secure
     // context: Web Crypto, credential storage and secure cookies need it.
     androidScheme: 'https',
+    // A local page works even when the installed WebView cannot run the app.
+    errorPath: 'native-update.html',
   },
 
   android: {

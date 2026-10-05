@@ -63,6 +63,7 @@ export default function App() {
               <Route path="/register" element={<Register />} />
               <Route path="/forgot-password" element={<ForgotPassword />} />
               <Route path="/reset-password/:token" element={<ResetPassword />} />
+              {/* Public instructions; DeleteAccount locks its authenticated content. */}
               <Route path="/delete-account" element={<DeleteAccount />} />
               {/* Apple requires both of these to be reachable before an app can
                   be submitted for review. */}

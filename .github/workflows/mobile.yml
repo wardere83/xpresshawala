@@ -471,7 +471,7 @@ jobs:
           node scripts/ci/inspect-app-store-build.mjs "$KEY_PATH" "${{ github.run_number }}"
 
           rm -f ~/.appstoreconnect/private_keys/AuthKey_${APPSTORE_KEY_ID}.p8
-          echo "Uploaded. Processing in App Store Connect usually takes 10 to 15 minutes."
+          echo "Uploaded and Apple processing verified."
 
       - name: Say why TestFlight was skipped
         if: env.APPSTORE_PRIVATE_KEY == ''

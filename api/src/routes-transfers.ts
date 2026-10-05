@@ -7,6 +7,7 @@ import { guardedPostingStatements } from './ledger-db'
 import { QuoteError, quote, type Corridor } from './money'
 import type { Env, Vars } from './env'
 import { requireUser, USER_COOKIE } from './sessions'
+import { sanctionsScreeningStatement } from './sanctions'
 import {
   auditSanctionsUnavailable,
   checkLimits,
@@ -353,19 +354,70 @@ transfers.post('/transfers/:id/pay', async (c) => {
     throw error
   }
   const now = new Date().toISOString()
-  const statements = transferScreeningStatements(c.env, id, screening, 'payment')
   if (screening.blocked) {
-    await c.env.DB.batch([
-      ...statements,
-      c.env.DB.prepare(`UPDATE transfers SET status = 'compliance_hold', updated_at = ? WHERE id = ? AND user_id = ? AND paid_at IS NULL AND status IN ('awaiting_payment', 'compliance_hold')`)
-        .bind(now, id, user.id),
-      c.env.DB.prepare(`INSERT INTO transfer_events (id, transfer_id, from_status, to_status, actor_type, actor_id, note, created_at) VALUES (?, ?, ?, 'compliance_hold', 'system', NULL, 'Sanctions review required before payment', ?)`)
-        .bind(newId('tev'), id, String(t.status), now),
+    const sessionHash = await hashToken(getCookie(c, USER_COOKIE) ?? '')
+    const claimId = newId('scr')
+    const [claimCheck, ...remainingChecks] = screening.checks
+    if (!claimCheck) return c.json({ error: 'sanctions_unavailable' }, 503)
+    // This unique screening row is the claim for the blocked attempt. Recheck
+    // mutable account, session, identity and source state before any evidence
+    // is written; the whole batch must lose to a completed account deletion.
+    const eligibility = {
+      sql: `EXISTS (
+        SELECT 1 FROM transfers
+        JOIN users u ON u.id=transfers.user_id
+        JOIN recipients r ON r.id=transfers.recipient_id
+        WHERE transfers.id=? AND transfers.user_id=? AND transfers.status=? AND transfers.paid_at IS NULL
+          AND (transfers.quote_expires_at IS NULL OR transfers.quote_expires_at>?)
+          AND u.id=? AND u.status='active' AND u.password_hash=?
+          AND u.kyc_status='verified' AND u.kyc_tier BETWEEN 1 AND 3 AND u.kyc_tier=CAST(u.kyc_tier AS INTEGER)
+          AND u.first_name=? AND u.last_name=? AND u.kyc_tier=?
+          AND r.id=? AND r.user_id=u.id AND r.archived_at IS NULL AND r.full_name=?
+          AND EXISTS (SELECT 1 FROM sessions s WHERE s.user_id=u.id AND s.token_hash=? AND s.revoked_at IS NULL AND s.expires_at>?)
+          AND EXISTS (
+            SELECT 1 FROM sanctions_active a JOIN sanctions_datasets d ON d.snapshot_id=a.snapshot_id
+            WHERE a.singleton=1 AND d.status='ready' AND a.snapshot_id=? AND d.content_hash=?
+              AND a.last_success_checked_at>=? AND a.last_success_checked_at<=?
+          )
+      )`,
+      values: [id, user.id, String(t.status), now, screening.subjects.sender.subjectId,
+        String(creds.password_hash), screening.subjects.firstName, screening.subjects.lastName,
+        screening.subjects.kycTier, screening.subjects.recipient.subjectId, screening.subjects.recipient.name,
+        sessionHash, now, screening.dataset.version, screening.dataset.contentSha256,
+        new Date(new Date(now).getTime() - 24 * 3600_000).toISOString(), now],
+    }
+    const heldClaim = {
+      sql: `EXISTS (SELECT 1 FROM sanctions_screenings s JOIN transfers t ON t.id=s.transfer_id
+        WHERE s.id=? AND t.id=? AND t.user_id=? AND t.status='compliance_hold' AND t.paid_at IS NULL)`,
+      values: [claimId, id, user.id],
+    }
+    const results = await c.env.DB.batch([
+      sanctionsScreeningStatement(c.env, {
+        id: claimId, subjectType: claimCheck.subject.subjectType, subjectId: claimCheck.subject.subjectId,
+        name: claimCheck.subject.name, transferId: id, stage: 'payment', guard: eligibility,
+      }, claimCheck.result),
+      c.env.DB.prepare(`UPDATE transfers SET status = 'compliance_hold', updated_at = ?
+        WHERE id=? AND user_id=? AND status=? AND paid_at IS NULL
+          AND EXISTS (SELECT 1 FROM sanctions_screenings s WHERE s.id=? AND s.transfer_id=transfers.id)
+          AND ${eligibility.sql}`)
+        .bind(now, id, user.id, String(t.status), claimId, ...eligibility.values),
+      ...remainingChecks.map(({ subject, result }) => sanctionsScreeningStatement(c.env, {
+        subjectType: subject.subjectType, subjectId: subject.subjectId, name: subject.name,
+        transferId: id, stage: 'payment', guard: heldClaim,
+      }, result)),
+      ...(t.status === 'awaiting_payment' ? [
+        c.env.DB.prepare(`INSERT INTO transfer_events (id, transfer_id, from_status, to_status, actor_type, actor_id, note, created_at)
+          SELECT ?, ?, ?, 'compliance_hold', 'system', NULL, 'Sanctions review required before payment', ? WHERE ${heldClaim.sql}`)
+          .bind(newId('tev'), id, String(t.status), now, ...heldClaim.values),
+        complianceAuditStatement(c.env, {
+          actorType: 'system', action: 'transfer.sanctions_hold', entityType: 'transfer', entityId: id,
+          metadata: { stage: 'payment', datasetVersion: screening.dataset.version }, ip: c.req.header('cf-connecting-ip'),
+        }, now, heldClaim),
+      ] : []),
     ])
-    await audit(c.env.DB, {
-      actorType: 'system', action: 'transfer.sanctions_hold', entityType: 'transfer', entityId: id,
-      metadata: { stage: 'payment', datasetVersion: screening.dataset.version }, ip: c.req.header('cf-connecting-ip'),
-    })
+    if (results[0].meta.changes !== 1 || results[1].meta.changes !== 1) {
+      return c.json({ error: 'screening_changed', message: 'Transfer details or screening data changed. Please try again.' }, 409)
+    }
     return c.json({ error: screening.confirmed ? 'sanctions_blocked' : 'sanctions_review_required', status: 'compliance_hold', message: 'This transfer requires compliance review.' }, 403)
   }
 
@@ -380,9 +432,7 @@ transfers.post('/transfers/:id/pay', async (c) => {
     receiveCurrency: String(t.receive_currency),
     reference: String(t.reference),
   }), operationReference, now)
-  const claimIndex = statements.length
   const results = await c.env.DB.batch([
-    ...statements,
     c.env.DB.prepare(
       `UPDATE transfers SET status = 'compliance_hold', paid_at = ?, updated_at = ?,
               payment_provider = 'test', payment_intent_id = ?
@@ -394,6 +444,7 @@ transfers.post('/transfers/:id/pay', async (c) => {
           ${guard.sql}`,
     ).bind(now, now, operationReference, id, user.id, String(t.status), now, creds.password_hash, sessionHash, now, ...guard.values),
     ...posting.statements,
+    ...transferScreeningStatements(c.env, id, screening, 'payment', posting.guard),
     c.env.DB.prepare(
       `INSERT INTO transfer_events (id, transfer_id, from_status, to_status, actor_type, actor_id, note, created_at)
        SELECT ?, ?, ?, 'compliance_hold', 'system', NULL, 'Test payment captured', ? WHERE ${posting.guard.sql}`,
@@ -404,7 +455,7 @@ transfers.post('/transfers/:id/pay', async (c) => {
       ip: c.req.header('cf-connecting-ip'),
     }, now, posting.guard),
   ])
-  const claim = results[claimIndex]
+  const claim = results[0]
   if (claim.meta.changes !== 1) return c.json({ error: 'screening_changed', message: 'Transfer details or screening data changed. Please try again.' }, 409)
 
   return c.json({ ok: true, status: 'compliance_hold', testMode: true })

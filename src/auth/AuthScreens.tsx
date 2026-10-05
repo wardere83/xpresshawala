@@ -4,6 +4,7 @@ import { brand } from '../config/brand'
 import { useT } from '../i18n'
 import { api, ApiError } from '../lib/api'
 import { Logo } from '../components/Logo'
+import { AppLock } from '../native/AppLock'
 import { JoinMedia } from './JoinMedia'
 import { useAuth } from './AuthContext'
 
@@ -296,7 +297,7 @@ export function DeleteAccount() {
     } catch (err) { setError(toMessage(err)) }
     finally { setBusy(false) }
   }
-  return <Shell title="Delete your XpressTend account" subtitle="Close your account and remove your sign-in details and profile contact information.">
+  const content = <Shell title="Delete your XpressTend account" subtitle="Close your account and remove your sign-in details and profile contact information.">
     {done ? <p role="status" className="rounded-xl bg-brand-50 p-4 text-[14px] leading-relaxed">Your account has been deleted and all sessions have been signed out. Transaction and compliance records are retained where required.</p> : <>
       <p className="mb-5 text-[13px] leading-relaxed text-ink-500">Deletion is permanent. Transaction, recipient and compliance records associated with financial activity may be retained to meet recordkeeping obligations. Transfers or unresolved funds must be settled before deletion.</p>
       {loading ? <p role="status">Loading your account…</p> : !user || isDemo ? <>
@@ -313,6 +314,10 @@ export function DeleteAccount() {
     </>}
     <AuthLegalLinks />
   </Shell>
+  // This route also serves public deletion instructions. Keep its own state
+  // above the conditional gate so deletion success survives signing out, while
+  // native relocking hides and retains the authenticated password form.
+  return user && !isDemo ? <AppLock>{content}</AppLock> : content
 }
 
 /** Gate for the product routes. */
