@@ -32,24 +32,31 @@ function cookieOptions(env: Env, maxAge: number) {
   }
 }
 
-export async function issueUserSession(c: Ctx, userId: string): Promise<void> {
+export async function issueUserSession(c: Ctx, userId: string, expectedPasswordHash?: string): Promise<boolean> {
   const token = randomHex(32)
   const expiresAt = new Date(Date.now() + USER_TTL_SECONDS * 1000).toISOString()
-  await c.env.DB.prepare(
+  const result = await c.env.DB.prepare(
     `INSERT INTO sessions (id, user_id, token_hash, expires_at, ip, user_agent, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+     SELECT ?, id, ?, ?, ?, ?, ? FROM users
+      WHERE id = ? AND status = 'active' AND (? IS NULL OR password_hash = ?)`,
   )
     .bind(
       newId('ses'),
-      userId,
       await hashToken(token),
       expiresAt,
       c.req.header('cf-connecting-ip') ?? null,
       c.req.header('user-agent') ?? null,
       new Date().toISOString(),
+      userId,
+      expectedPasswordHash ?? null,
+      expectedPasswordHash ?? null,
     )
     .run()
+  // A password reset or account deletion may finish while login is hashing.
+  // That request must not mint a new session from its old credential check.
+  if (result.meta.changes !== 1) return false
   setCookie(c, USER_COOKIE, token, cookieOptions(c.env, USER_TTL_SECONDS))
+  return true
 }
 
 export async function issueAdminSession(c: Ctx, adminId: string): Promise<void> {
@@ -100,7 +107,7 @@ export async function requireUser(c: Ctx, next: Next) {
   if (!token) return c.json({ error: 'not_authenticated' }, 401)
 
   const row = await c.env.DB.prepare(
-    `SELECT u.id, u.email, u.first_name, u.last_name, u.kyc_status, u.kyc_tier, u.status
+    `SELECT u.id, u.email, u.first_name, u.last_name, u.kyc_status, u.kyc_tier, u.status, u.created_at
        FROM sessions s JOIN users u ON u.id = s.user_id
       WHERE s.token_hash = ? AND s.revoked_at IS NULL AND s.expires_at > ?`,
   )
@@ -118,6 +125,7 @@ export async function requireUser(c: Ctx, next: Next) {
     kycStatus: String(row.kyc_status),
     kycTier: Number(row.kyc_tier),
     status: String(row.status),
+    createdAt: String(row.created_at),
   }
   c.set('user', user)
   await next()

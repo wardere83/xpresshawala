@@ -1,10 +1,11 @@
-import { Capacitor } from '@capacitor/core'
+import { Capacitor, CapacitorHttp } from '@capacitor/core'
 /**
  * Client for the XpressTend Worker API.
  *
- * Sessions are httpOnly cookies, so nothing here touches a token: every call
- * just sends credentials and lets the browser do it. That means an XSS bug
- * cannot read a session out of JavaScript.
+ * Sessions use httpOnly cookies. Browser requests send credentials; native
+ * requests use the platform cookie jar. This client never copies tokens into
+ * JavaScript storage or request bodies. Native bridge headers must still be
+ * treated as sensitive, which is why production bridge logging is disabled.
  */
 
 /**
@@ -34,6 +35,31 @@ export class ApiError extends Error {
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  if (Capacitor.isNativePlatform()) {
+    // Native HTTP uses the platform's cookie jar. WKWebView's third-party
+    // cookie restrictions otherwise discard the API's cross-origin session.
+    // Session cookies are never copied into localStorage or request payloads.
+    let response
+    try {
+      response = await CapacitorHttp.request({
+        url: `${API_BASE}${path}`,
+        method: init?.method ?? 'GET',
+        headers: { 'Content-Type': 'application/json', ...Object.fromEntries(new Headers(init?.headers)) },
+        data: typeof init?.body === 'string' ? JSON.parse(init.body) : undefined,
+        responseType: 'json',
+        connectTimeout: 15_000,
+        readTimeout: 30_000,
+      })
+    } catch {
+      throw new ApiError(0, 'network_unavailable', 'Cannot reach XpressTend right now.')
+    }
+    const body = typeof response.data === 'object' && response.data !== null ? response.data : {}
+    if (response.status < 200 || response.status >= 300) {
+      throw new ApiError(response.status, typeof body.error === 'string' ? body.error : 'request_failed',
+        typeof body.message === 'string' ? body.message : undefined)
+    }
+    return body as T
+  }
   let res: Response
   try {
     res = await fetch(`${API_BASE}${path}`, {
@@ -63,6 +89,8 @@ export const api = {
     request<T>(path, { method: 'POST', body: body === undefined ? undefined : JSON.stringify(body) }),
   patch: <T>(path: string, body?: unknown) =>
     request<T>(path, { method: 'PATCH', body: body === undefined ? undefined : JSON.stringify(body) }),
+  delete: <T>(path: string, body?: unknown) =>
+    request<T>(path, { method: 'DELETE', body: body === undefined ? undefined : JSON.stringify(body) }),
 }
 
 // ---------------------------------------------------------------- shapes
@@ -74,6 +102,7 @@ export interface AccountUser {
   kycStatus: string
   kycTier: number
   status: string
+  createdAt?: string
 }
 
 export interface AdminUser {

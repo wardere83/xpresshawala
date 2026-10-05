@@ -100,6 +100,11 @@ export function AppLayout() {
               </button>
             </div>
           )}
+          {!isDemo && (
+            <div role="note" className="border-b border-brand-200 bg-brand-50 px-4 py-3 text-[12px] leading-relaxed text-ink-700">
+              Test mode. Transfers are simulated; no customer funds are charged or delivered.
+            </div>
+          )}
           <Outlet />
           {NAV_ROUTES.includes(pathname) && <BottomNav />}
         </div>

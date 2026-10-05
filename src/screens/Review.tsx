@@ -9,15 +9,12 @@ import { maskedWallet, usd } from '../lib/format'
 import { outcomeFeedback, tapFeedback } from '../native/capabilities'
 import { corridorName } from '../data/mock'
 
-type Verification = 'face' | 'pin'
-
 export function Review() {
   const { t, lang } = useI18n()
   const { isDemo } = useAuth()
   const navigate = useNavigate()
-  const { recipient, corridor, quote, commit, commitError } = useTransfer()
+  const { recipient, corridor, quote, commit, commitError, availableError, quoteReady } = useTransfer()
 
-  const [method, setMethod] = useState<Verification>('face')
   const [stage, setStage] = useState<'idle' | 'verifying' | 'pin'>('idle')
 
   /**
@@ -48,7 +45,7 @@ export function Review() {
     } catch (err) {
       void outcomeFeedback('error')
       const message = err instanceof Error ? err.message : ''
-      setAuthError(/password/i.test(message) ? message : t('review.authFailed'))
+      setAuthError(message || t('review.authFailed'))
       setPassword('')
     } finally {
       setBusy(false)
@@ -69,6 +66,8 @@ export function Review() {
       <ScreenHeader title={t('review.title')} onBack={() => navigate(-1)} />
 
       <div className="flex-1 overflow-y-auto no-scrollbar px-4 pb-6">
+        {!isDemo && <p className="mb-3 rounded-xl bg-brand-50 px-4 py-3 text-[13px] text-brand-700">Test transfer only. No bank or card is charged and no money is delivered.</p>}
+        {availableError && <p role="alert" className="mb-3 text-[13px] text-alert">{availableError}</p>}
         {commitError ? (
           <p
             role="alert"
@@ -84,29 +83,29 @@ export function Review() {
             {t('field.summary')}
           </h2>
           <SummaryRow label={t('field.youSend')} value={usd(quote.amountUsd)} />
-          <SummaryRow label={t('field.fee')} value={usd(quote.fee)} />
+          <SummaryRow label={t('field.fee')} value={quoteReady ? usd(quote.fee) : '—'} />
           <div className="my-1 border-t border-ink-200/70" />
           <SummaryRow
             label={t('field.total')}
-            value={usd(quote.totalUsd)}
+            value={quoteReady ? usd(quote.totalUsd) : '—'}
             strong
           />
           <div className="my-1 border-t border-ink-200/70" />
           <SummaryRow
             label={t('field.recipientGets')}
-            value={usd(quote.recipientUsd)}
+            value={quoteReady ? usd(quote.recipientUsd) : '—'}
             strong
           />
           <SummaryRow label={t('field.to')} value={recipient.name} />
           <SummaryRow
-            label={t('field.mobileWallet')}
+            label={isDemo ? t('field.mobileWallet') : 'Saved payout details'}
             value={<bdi>{maskedWallet(recipient.wallet, recipient.last4)}</bdi>}
           />
           <SummaryRow
             label={t('field.country')}
             value={`${corridor.flag} ${corridorName(corridor, lang)}`}
           />
-          <SummaryRow label={t('field.delivery')} value={t('common.instant')} />
+          <SummaryRow label={t('field.delivery')} value={isDemo ? 'Demo simulation' : 'Not available in test mode'} />
         </section>
 
         {/* Important */}
@@ -128,47 +127,23 @@ export function Review() {
                 {t('review.securityCheck')}
               </h3>
               <p className="mt-1 text-[12px] leading-relaxed text-ink-500">
-                {t('review.securityBody')}
+              {isDemo ? 'This walkthrough simulates a transfer without moving funds.' : 'Your account password authorizes a test record. Compliance review is required; no funds move.'}
               </p>
             </div>
           </div>
         </section>
 
         {/* Verification choice */}
-        {!isDemo && (
-          <div className="mt-4 grid grid-cols-2 gap-3">
-            {[{ id: 'pin' as const, label: t('review.pin'), icon: Lock }].map(
-              ({ id, label, icon: Icon }) => {
-                const active = method === id
-                return (
-                  <button
-                    key={id}
-                    type="button"
-                    onClick={() => setMethod(id)}
-                    aria-pressed={active}
-                    className={`flex items-center justify-center gap-2 rounded-xl border py-3.5 text-[14px] font-bold transition ${
-                      active
-                        ? 'border-brand-600 bg-brand-50 text-brand-700'
-                        : 'border-ink-200 bg-white text-ink-500 hover:bg-canvas'
-                    }`}
-                  >
-                    <Icon size={18} strokeWidth={2.1} />
-                    {label}
-                  </button>
-                )
-              },
-            )}
-          </div>
-        )}
+        {!isDemo && <p className="mt-4 flex items-center gap-2 text-[13px] text-ink-700"><Lock size={16} />Authorize with your account password</p>}
 
         <div className="mt-5">
           <PrimaryButton
             onClick={start}
-            disabled={busy || stage === 'verifying'}
+            disabled={busy || stage === 'verifying' || !!availableError || !quoteReady}
           >
             {stage === 'verifying'
               ? t('review.verifying')
-              : t('review.send', { amount: usd(quote.totalUsd) })}
+              : isDemo ? t('review.send', { amount: usd(quote.totalUsd) }) : 'Create test transfer'}
           </PrimaryButton>
         </div>
       </div>

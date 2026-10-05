@@ -1,43 +1,70 @@
+import { lazy, Suspense } from 'react'
 import { HashRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { AppLayout } from './components/AppLayout'
 import { AppLock } from './native/AppLock'
 import { NativeShell } from './native/NativeShell'
+import { isNative } from './native/capabilities'
 import { I18nProvider } from './i18n/I18nProvider'
 import { AccountDataProvider } from './state/AccountDataProvider'
 import { TransferProvider } from './state/TransferProvider'
 import { AuthProvider } from './auth/AuthProvider'
-import { Login, RequireAuth, Register } from './auth/AuthScreens'
-import { AdminConsole } from './admin/AdminConsole'
-import { InviteAccept } from './admin/InviteAccept'
-import { StaffPasswordReset } from './admin/StaffPasswordReset'
-import { Marketing } from './marketing/Marketing'
+import { Login, RequireAuth, Register, ForgotPassword, ResetPassword, DeleteAccount } from './auth/AuthScreens'
 import { Privacy, Support as LegalSupport } from './marketing/Legal'
-import { Company, Compliance, Partners, Security } from './marketing/Company'
-import { Home } from './screens/Home'
-import { Voice } from './screens/Voice'
-import { Assistant } from './screens/Assistant'
-import { SendMoney } from './screens/SendMoney'
-import { Review } from './screens/Review'
-import { Success } from './screens/Success'
-import { Recipients } from './screens/Recipients'
-import { Activity } from './screens/Activity'
-import { Profile } from './screens/Profile'
-import { Help, Rates, Refer, Support } from './screens/Info'
+
+const AdminConsole = lazy(() => import('./admin/AdminConsole').then(module => ({ default: module.AdminConsole })))
+
+const InviteAccept = lazy(() => import('./admin/InviteAccept').then(module => ({ default: module.InviteAccept })))
+
+const StaffPasswordReset = lazy(() => import('./admin/StaffPasswordReset').then(module => ({ default: module.StaffPasswordReset })))
+
+const Marketing = lazy(() => import('./marketing/Marketing').then(module => ({ default: module.Marketing })))
+
+const Company = lazy(() => import('./marketing/Company').then(module => ({ default: module.Company })))
+const Compliance = lazy(() => import('./marketing/Company').then(module => ({ default: module.Compliance })))
+const Partners = lazy(() => import('./marketing/Company').then(module => ({ default: module.Partners })))
+const Security = lazy(() => import('./marketing/Company').then(module => ({ default: module.Security })))
+
+const Home = lazy(() => import('./screens/Home').then(module => ({ default: module.Home })))
+
+const Voice = lazy(() => import('./screens/Voice').then(module => ({ default: module.Voice })))
+
+const Assistant = lazy(() => import('./screens/Assistant').then(module => ({ default: module.Assistant })))
+
+const SendMoney = lazy(() => import('./screens/SendMoney').then(module => ({ default: module.SendMoney })))
+
+const Review = lazy(() => import('./screens/Review').then(module => ({ default: module.Review })))
+
+const Success = lazy(() => import('./screens/Success').then(module => ({ default: module.Success })))
+
+const Recipients = lazy(() => import('./screens/Recipients').then(module => ({ default: module.Recipients })))
+
+const Activity = lazy(() => import('./screens/Activity').then(module => ({ default: module.Activity })))
+
+const Profile = lazy(() => import('./screens/Profile').then(module => ({ default: module.Profile })))
+
+const Help = lazy(() => import('./screens/Info').then(module => ({ default: module.Help })))
+const Rates = lazy(() => import('./screens/Info').then(module => ({ default: module.Rates })))
+const Refer = lazy(() => import('./screens/Info').then(module => ({ default: module.Refer })))
+const Support = lazy(() => import('./screens/Info').then(module => ({ default: module.Support })))
 
 export default function App() {
   return (
     <I18nProvider>
-      <AppLock>
       <AuthProvider>
         <AccountDataProvider>
         <TransferProvider>
           <HashRouter>
             <NativeShell />
+            <Suspense fallback={<div role="status" className="grid min-h-dvh place-items-center bg-canvas">Loading XpressTend…</div>}>
             <Routes>
               {/* Public shopfront and the way in. */}
-              <Route path="/" element={<Marketing />} />
+              <Route path="/" element={isNative ? <Navigate to="/app" replace /> : <Marketing />} />
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
+              <Route path="/forgot-password" element={<ForgotPassword />} />
+              <Route path="/reset-password/:token" element={<ResetPassword />} />
+              {/* Public instructions; DeleteAccount locks its authenticated content. */}
+              <Route path="/delete-account" element={<DeleteAccount />} />
               {/* Apple requires both of these to be reachable before an app can
                   be submitted for review. */}
               <Route path="/privacy" element={<Privacy />} />
@@ -57,7 +84,7 @@ export default function App() {
               {/* The product. */}
               {/* Real sessions and the explicitly selected local explore mode
                   share the same product screens. */}
-              <Route element={<RequireAuth><AppLayout /></RequireAuth>}>
+              <Route element={<RequireAuth><AppLock><AppLayout /></AppLock></RequireAuth>}>
                 <Route path="/app" element={<Home />} />
                 <Route path="voice" element={<Voice />} />
                 <Route path="assistant" element={<Assistant />} />
@@ -75,11 +102,11 @@ export default function App() {
 
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
+            </Suspense>
           </HashRouter>
         </TransferProvider>
         </AccountDataProvider>
       </AuthProvider>
-      </AppLock>
     </I18nProvider>
   )
 }

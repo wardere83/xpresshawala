@@ -22,10 +22,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [demo, setDemo] = useState(false)
   const [loading, setLoading] = useState(true)
 
+  const loadSession = useCallback(async () => {
+    const { user } = await api.get<{ user: AccountUser }>('/auth/me')
+    setUser(user)
+    return user
+  }, [])
+
   const refresh = useCallback(async () => {
     try {
-      const { user } = await api.get<{ user: AccountUser }>('/auth/me')
-      setUser(user)
+      await loadSession()
     } catch (err) {
       // 401 simply means signed out; anything else is left to the caller's UI.
       if (!(err instanceof ApiError) || err.status !== 401) console.warn('session check failed', err)
@@ -33,7 +38,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [loadSession])
 
   useEffect(() => {
     void refresh()
@@ -52,13 +57,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       refresh,
       signIn: async (email, password) => {
         await api.post('/auth/login', { email, password })
+        // A successful login response alone does not prove the session cookie
+        // was accepted. Do not navigate into a signed-out or demo account.
+        await loadSession()
         setDemo(false)
-        await refresh()
       },
       register: async (input) => {
         await api.post('/auth/register', input)
+        try {
+          await loadSession()
+        } catch (err) {
+          if (err instanceof ApiError && err.status === 401) {
+            throw new ApiError(401, 'registration_incomplete', 'If you already have an account, sign in or reset your password. Otherwise, please try again.')
+          }
+          throw err
+        }
         setDemo(false)
-        await refresh()
       },
       signOut: async () => {
         if (demo && !user) {
@@ -70,7 +84,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setDemo(false)
       },
     }),
-    [user, demo, loading, refresh],
+    [user, demo, loading, refresh, loadSession],
   )
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>

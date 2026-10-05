@@ -356,24 +356,28 @@ admin.post('/users/:id/kyc', requireRole('compliance', 'owner'), async (c) => {
   if (b.decision !== 'verified' && b.decision !== 'rejected') {
     return c.json({ error: 'decision_must_be_verified_or_rejected' }, 400)
   }
-  const tier = b.decision === 'verified' ? Math.min(Math.max(b.tier ?? 1, 1), 3) : 0
+  const tier = b.decision === 'verified' ? b.tier ?? 1 : 0
+  if (!Number.isInteger(tier) || tier < 0 || tier > 3 || (b.decision === 'verified' && tier < 1)) {
+    return c.json({ error: 'invalid_kyc_tier' }, 400)
+  }
   const now = new Date().toISOString()
+  const kycId = newId('kyc')
 
-  await c.env.DB.batch([
-    c.env.DB.prepare(`UPDATE users SET kyc_status = ?, kyc_tier = ?, updated_at = ? WHERE id = ?`)
+  const results = await c.env.DB.batch([
+    c.env.DB.prepare(`UPDATE users SET kyc_status = ?, kyc_tier = ?, updated_at = ? WHERE id = ? AND status='active'`)
       .bind(b.decision, tier, now, id),
     c.env.DB.prepare(
       `INSERT INTO kyc_checks (id, user_id, provider, status, result_json, reviewed_by, reviewed_at, created_at)
-       VALUES (?, ?, 'manual', ?, ?, ?, ?, ?)`,
-    ).bind(newId('kyc'), id, b.decision === 'verified' ? 'passed' : 'failed',
-           JSON.stringify({ note: b.note ?? null, tier }), staff.id, now, now),
+       SELECT ?,id,'manual',?,?,?,?,? FROM users WHERE id=? AND status='active'`,
+    ).bind(kycId, b.decision === 'verified' ? 'passed' : 'failed',
+           JSON.stringify({ note: b.note ?? null, tier }), staff.id, now, now, id),
+    complianceAuditStatement(c.env, {
+      actorType: 'admin', actorId: staff.id, action: 'user.kyc_decision',
+      entityType: 'user', entityId: id, metadata: { decision: b.decision, tier },
+      ip: c.req.header('cf-connecting-ip'),
+    }, now, { sql: 'EXISTS (SELECT 1 FROM kyc_checks WHERE id=?)', values: [kycId] }),
   ])
-
-  await audit(c.env.DB, {
-    actorType: 'admin', actorId: staff.id, action: 'user.kyc_decision',
-    entityType: 'user', entityId: id, metadata: { decision: b.decision, tier },
-    ip: c.req.header('cf-connecting-ip'),
-  })
+  if (results[0]?.meta.changes !== 1) return c.json({ error: 'account_changed' }, 409)
   return c.json({ ok: true, kycStatus: b.decision, kycTier: tier })
 })
 

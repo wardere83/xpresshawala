@@ -67,7 +67,7 @@
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<true/>
 	<key>NSFaceIDUsageDescription</key>
-	<string>XpressTend uses Face ID to unlock the app and to confirm a transfer before money leaves your account.</string>
+	<string>XpressTend uses Face ID to unlock the app and protect access to your account.</string>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
 </dict>

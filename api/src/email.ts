@@ -4,9 +4,9 @@ import type { Env } from './env'
  * Transactional email.
  *
  * Two providers, chosen by which secrets exist, and no provider at all is a
- * supported state: `send` then reports `configured: false` and the caller falls
- * back to handing an owner a link to pass on by hand. Staff invites and
- * password resets both work that way today.
+ * supported state: `send` then reports `configured: false`. Staff invites and
+ * staff resets may use an authenticated owner-issued link. Customer recovery
+ * has no token-return fallback and revokes a token that could not be delivered.
  *
  * Microsoft 365 is tried first, because it is what the domain is actually set
  * up for. The DNS says so plainly:
@@ -76,9 +76,8 @@ async function microsoftToken(env: Env): Promise<string | null> {
   })
 
   if (!res.ok) {
-    const detail = await res.text().catch(() => '')
-    // Logged, never returned: the body can echo the client secret back.
-    console.error('microsoft token failed', res.status, detail.slice(0, 300))
+    // Provider response bodies can echo credentials or reset links.
+    console.error('microsoft token failed', res.status)
     return null
   }
 
@@ -125,8 +124,7 @@ async function sendViaMicrosoft(
   )
 
   if (!res.ok) {
-    const detail = await res.text().catch(() => '')
-    console.error('microsoft send failed', res.status, detail.slice(0, 300))
+    console.error('microsoft send failed', res.status)
     return { configured: true, sent: false, provider: 'microsoft365', error: `graph_${res.status}` }
   }
   return { configured: true, sent: true, provider: 'microsoft365' }
@@ -150,9 +148,7 @@ async function sendViaResend(
     }),
   })
   if (!res.ok) {
-    const detail = await res.text().catch(() => '')
-    // Never surface the provider's response to the caller; it can echo the key.
-    console.error('email send failed', res.status, detail.slice(0, 300))
+    console.error('email send failed', res.status)
     return { configured: true, sent: false, provider: 'resend', error: `provider_${res.status}` }
   }
   return { configured: true, sent: true, provider: 'resend' }
@@ -172,8 +168,8 @@ export async function sendEmail(
     return hasMicrosoft
       ? await sendViaMicrosoft(env, from, msg)
       : await sendViaResend(resendKey as string, from, msg)
-  } catch (err) {
-    console.error('email send threw', err)
+  } catch {
+    console.error('email send threw')
     return { configured: true, sent: false, error: 'network' }
   }
 }
@@ -294,6 +290,23 @@ export function signInEmailReminderEmail(args: { name: string; email: string; li
           If you did not ask for this, you can ignore this email.
         </p>
       </div>`,
+  }
+}
+
+/** Customer reset capabilities are delivered exclusively to the account email. */
+export function customerPasswordResetEmail(args: { name: string; link: string; minutes: number }) {
+  const { name, link, minutes } = args
+  return {
+    subject: 'Reset your XpressTend password',
+    text: [`Hi ${name},`, '', 'Choose a new XpressTend password:', link, '',
+      `This link expires in ${minutes} minutes and can only be used once.`,
+      'After resetting, sign in again on your devices. Your existing sessions will be signed out.',
+      'If you did not request this, ignore this email. Your password has not changed.'].join('\n'),
+    html: `<div style="font-family:system-ui,-apple-system,sans-serif;max-width:520px;color:#18313B">
+      <p>Hi ${escapeHtml(name)},</p><p>Choose a new XpressTend password.</p>
+      <p><a href="${escapeHtml(link)}" style="background:#0B252F;color:#fff;padding:12px 22px;border-radius:10px;text-decoration:none">Reset password</a></p>
+      <p>This link expires in ${minutes} minutes and can only be used once. Your existing sessions will be signed out after resetting.</p>
+      <p>If you did not request this, ignore this email. Your password has not changed.</p></div>`,
   }
 }
 

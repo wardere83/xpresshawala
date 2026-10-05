@@ -16,15 +16,23 @@ const config: CapacitorConfig = {
   appId: 'com.xpresstend.app',
   appName: 'XpressTend',
   webDir: 'dist',
+  // Native HTTP libraries may log response cookies when bridge logging is on.
+  loggingBehavior: 'none',
 
   server: {
     // https rather than the legacy http scheme, so the webview is a secure
     // context: Web Crypto, credential storage and secure cookies need it.
     androidScheme: 'https',
+    // A local page works even when the installed WebView cannot run the app.
+    errorPath: 'native-update.html',
   },
 
   android: {
     allowMixedContent: false,
+    // Match the production bundle and Tailwind's browser requirements.
+    minWebViewVersion: 111,
+    webContentsDebuggingEnabled: false,
+    zoomEnabled: true,
   },
 
   ios: {

@@ -1,7 +1,5 @@
 name: Mobile builds
 
-# last triggered: 2026-09-02T21:51:14Z
-
 # Note: this workflow has a paths filter, so an empty commit will not
 # trigger it. Use the Actions tab's "Run workflow" button to re-run by hand.
 
@@ -11,6 +9,8 @@ name: Mobile builds
 
 on:
   workflow_dispatch:
+  pull_request:
+    branches: [main]
   push:
     branches: [main]
     paths:
@@ -21,109 +21,159 @@ on:
       - 'ios/**'
       - 'capacitor.config.ts'
       - 'package.json'
+      - 'package-lock.json'
+      - 'vite.config.ts'
+      - 'tsconfig*.json'
+      - 'api/**'
+      - 'tests/**'
+      - 'playwright.config.ts'
       - '.github/workflows/mobile.yml'
       # The signing steps run these, so a fix to one has to trigger a build.
       - 'scripts/ci/**'
 
 permissions:
-  # The Android job publishes a release, whose assets are downloadable without
-  # a GitHub login. Actions artifacts are not: they require one, so they cannot
-  # sit behind a public download button.
-  contents: write
+  contents: read
+
+concurrency:
+  group: mobile-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  android:
-    name: Android APK
+  quality:
+    name: Release quality checks
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
+      - run: npm ci
+      - run: npm ci --prefix api
+      - run: npm run lint
+      - run: npm run typecheck --prefix api
+      - run: npm test --prefix api
+      - run: npm run build
+      - run: npx playwright install --with-deps chrome
+      - run: npm run test:e2e
+      - name: Keep failed release browser diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mobile-browser-failure-diagnostics
+          path: test-results
+          retention-days: 7
+          if-no-files-found: ignore
 
+  android-check:
+    name: Android release compile and lint
+    needs: quality
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '21'
-
       - run: npm ci
+      - run: npm run build:mobile
+        env:
+          VITE_API_URL: https://xpresstend.com/api
+      - run: ./gradlew --no-daemon assembleRelease bundleRelease lintRelease testReleaseUnitTest
+        working-directory: android
 
-      - name: Build the web app and sync it into the native project
+  android:
+    name: Android signed APK and Play App Bundle
+    needs: quality
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - run: npm ci
+      - name: Build and sync the production app
         run: npm run build:mobile
         env:
-          # Points the app at production. Override for a staging build.
           VITE_API_URL: https://xpresstend.com/api
-
-      - name: Assemble the release APK
+      - name: Assemble signed release APK and App Bundle
         env:
           ANDROID_KEYSTORE: ${{ secrets.ANDROID_KEYSTORE }}
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          ANDROID_KEYSTORE_TYPE: ${{ secrets.ANDROID_KEYSTORE_TYPE }}
+          ANDROID_REQUIRE_SIGNING: 'true'
+          ANDROID_VERSION_CODE: ${{ github.run_number }}
         run: |
           set -euo pipefail
-          if [ -z "$ANDROID_KEYSTORE" ] || [ ${#ANDROID_KEYSTORE} -lt 4000 ]; then
-            echo "::warning::ANDROID_KEYSTORE not set — building a DEBUG APK as fallback."
-            ./gradlew --no-daemon assembleDebug
-            mkdir -p app/build/outputs/apk/release && cp app/build/outputs/apk/debug/*.apk app/build/outputs/apk/release/
-            exit 0
+          if [ -z "$ANDROID_KEYSTORE" ] || [ -z "$ANDROID_KEYSTORE_PASSWORD" ]; then
+            echo "::error::Android release signing credentials are required. No debug fallback can be published."
+            exit 1
           fi
-          echo "$ANDROID_KEYSTORE" | tr -d '\n' | base64 --decode > "$RUNNER_TEMP/upload.keystore"
           export ANDROID_KEYSTORE_PATH="$RUNNER_TEMP/upload.keystore"
-          export ANDROID_KEYSTORE_PASSWORD
-          ./gradlew --no-daemon assembleRelease
-          rm -f "$RUNNER_TEMP/upload.keystore"
+          trap 'rm -f "$ANDROID_KEYSTORE_PATH"' EXIT
+          ../scripts/ci/decode-base64-secret.sh ANDROID_KEYSTORE "$ANDROID_KEYSTORE_PATH" "Android upload keystore"
+          ./gradlew --no-daemon assembleRelease bundleRelease lintRelease testReleaseUnitTest
         working-directory: android
-
-      - name: Confirm the APK is signed and not debuggable
-        run: |
-          set -euo pipefail
-          APK=$(find android/app/build/outputs/apk/release -name '*.apk' | head -1)
-          echo "built $APK"
-          # A release APK must carry a signature block and must not be debuggable.
-          unzip -l "$APK" | grep -qE 'META-INF/.*\.(RSA|EC|DSA)' \
-            || echo "::warning::The APK carries no signature block."
-          "$ANDROID_HOME/build-tools/$(ls "$ANDROID_HOME/build-tools" | sort -V | tail -1)/aapt" \
-            dump badging "$APK" | grep -q "application-debuggable" \
-            && echo "::warning::The APK is debuggable." || true
-          echo "Signed, not debuggable."
-
-      - name: Upload the APK as a build artifact
+      - name: Verify APK and App Bundle release signatures and metadata
+        run: scripts/ci/verify-android-release.sh
+        env:
+          EXPECTED_ANDROID_VERSION_CODE: ${{ github.run_number }}
+      - name: Upload verified Android artifacts
         uses: actions/upload-artifact@v4
         with:
           name: xpresstend-android-release
-          path: android/app/build/outputs/apk/release/*.apk
+          path: |
+            android/app/build/outputs/apk/release/*.apk
+            android/app/build/outputs/bundle/release/*.aab
           retention-days: 30
           if-no-files-found: error
-
-      - name: Name the APK after the build
-        if: github.ref == 'refs/heads/main'
+      - name: Prepare public Android download
         run: |
           mkdir -p release
-          cp android/app/build/outputs/apk/release/*.apk release/xpresstend.apk
-
-      - name: Publish the rolling release
-        if: github.ref == 'refs/heads/main'
+          cp android/app/build/outputs/apk/release/app-release.apk release/xpresstend.apk
+          (cd release && sha256sum xpresstend.apk > SHA256SUMS)
+      - name: Publish the verified rolling download
         uses: softprops/action-gh-release@v2
         with:
           tag_name: android-latest
           name: XpressTend for Android
           body: |
-            The latest Android build, published automatically from `main`.
+            Signed release APK built from main. Transfers remain in test mode; no customer funds are charged or delivered.
 
-            **Install:** download `xpresstend.apk`, open it on your phone and
-            allow installation from unknown sources when prompted.
-
-            Signed with the XpressTend upload key. Not a Play Store release, so
-            Android will still warn that it comes from outside the store.
-          files: release/xpresstend.apk
+            Download xpresstend.apk to install directly. The separately signed Google Play App Bundle is available in this run's xpresstend-android-release artifact.
+          files: |
+            release/xpresstend.apk
+            release/SHA256SUMS
           make_latest: true
 
   ios:
     name: iOS (compile check)
-    runs-on: macos-15
+    needs: quality
+    runs-on: macos-26
     steps:
       - uses: actions/checkout@v4
+
+      - name: Select the current Xcode toolchain
+        run: |
+          set -euo pipefail
+          NEWEST=$(ls -d /Applications/Xcode*.app | sort -V | tail -1)
+          sudo xcode-select -s "$NEWEST/Contents/Developer"
+          xcodebuild -version
 
       - uses: actions/setup-node@v4
         with:
@@ -157,19 +207,49 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: xpresstend-ios-simulator
-          path: ios/App/build/Build/Products/Debug-iphonesimulator/App.app
+          path: ios/App/build/Build/Products/Debug-iphonesimulator/XpressTend.app
           retention-days: 30
-          if-no-files-found: warn
+          if-no-files-found: error
+
+      - name: Launch the app on an iPhone simulator
+        run: |
+          set -euo pipefail
+          xcrun simctl list devices available --json > "$RUNNER_TEMP/simulators.json"
+          DEVICE=$(python3 - "$RUNNER_TEMP/simulators.json" <<'PY'
+          import json, sys
+          devices = json.load(open(sys.argv[1]))['devices']
+          phones = [(runtime, device['udid']) for runtime, entries in devices.items()
+                    if 'iOS' in runtime for device in entries
+                    if device.get('isAvailable') and device['name'].startswith('iPhone')]
+          if not phones: raise SystemExit('No iPhone simulator is available')
+          print(sorted(phones, reverse=True)[0][1])
+          PY
+          )
+          xcrun simctl boot "$DEVICE" || true
+          xcrun simctl bootstatus "$DEVICE" -b
+          xcrun simctl install "$DEVICE" ios/App/build/Build/Products/Debug-iphonesimulator/XpressTend.app
+          xcrun simctl launch "$DEVICE" com.xpresstend.app
+          # Let the native splash and first API session check finish.
+          sleep 12
+          xcrun simctl io "$DEVICE" screenshot "$RUNNER_TEMP/ios-launch.png"
+          xcrun simctl shutdown "$DEVICE"
+      - name: Keep the native launch screenshot
+        uses: actions/upload-artifact@v4
+        with:
+          name: xpresstend-ios-launch
+          path: ${{ runner.temp }}/ios-launch.png
+          if-no-files-found: error
 
   ios-signed:
     name: iOS signed build
+    needs: quality
     # App Store Connect rejects anything built with an SDK older than iOS 26:
     #   "This app was built with the iOS 18.5 SDK. All iOS and iPadOS apps must
     #    be built with the iOS 26 SDK or later"
     # macos-15 tops out at Xcode 16, so the whole build ran and then failed at
     # the very last step. The image has to carry Xcode 26.
     runs-on: macos-26
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
     # Job level, not step level: a step's `if` is evaluated before its own env
     # block exists, so guarding on a step-scoped secret silently skips the step
     # and the job still passes.
@@ -185,12 +265,17 @@ jobs:
 
       - name: Confirm signing is configured
         run: |
-          if [ -z "$APPLE_CERTIFICATE_P12" ]; then
+          set -euo pipefail
+          if [ -z "$APPLE_CERTIFICATE_P12" ] || [ -z "$APPLE_PROVISIONING_PROFILE" ]; then
             echo "::error::Signing secrets are missing, so no IPA can be produced."
             echo "Set APPLE_CERTIFICATE_P12, APPLE_CERTIFICATE_PASSWORD and APPLE_PROVISIONING_PROFILE."
             exit 1
           fi
-          echo "Signing secrets present."
+          if [ -n "$APPSTORE_PRIVATE_KEY" ] && { [ -z "$APPSTORE_KEY_ID" ] || [ -z "$APPSTORE_ISSUER_ID" ]; }; then
+            echo "::error::TestFlight upload requires the API key ID and issuer ID."
+            exit 1
+          fi
+          echo "Signing prerequisites present."
 
       - name: Select the newest Xcode and require an iOS 26 SDK
         run: |
@@ -230,14 +315,16 @@ jobs:
       - name: Create a throwaway keychain
         if: env.APPLE_CERTIFICATE_P12 != ''
         run: |
-          set -euxo pipefail
+          set -euo pipefail
           echo "KEYCHAIN=$RUNNER_TEMP/signing.keychain-db" >> "$GITHUB_ENV"
-          echo "KEYCHAIN_PW=$(uuidgen)" >> "$GITHUB_ENV"
+          KEYCHAIN_PW=$(uuidgen)
+          echo "::add-mask::$KEYCHAIN_PW"
+          echo "KEYCHAIN_PW=$KEYCHAIN_PW" >> "$GITHUB_ENV"
 
       - name: Initialise the keychain and search list
         if: env.APPLE_CERTIFICATE_P12 != ''
         run: |
-          set -euxo pipefail
+          set -euo pipefail
           security create-keychain -p "$KEYCHAIN_PW" "$KEYCHAIN"
           security set-keychain-settings -lut 3600 "$KEYCHAIN"
           security unlock-keychain -p "$KEYCHAIN_PW" "$KEYCHAIN"
@@ -249,7 +336,7 @@ jobs:
       - name: Install the Apple WWDR intermediate
         if: env.APPLE_CERTIFICATE_P12 != ''
         run: |
-          set -euxo pipefail
+          set -euo pipefail
           curl -fsSL -o "$RUNNER_TEMP/wwdr.cer" https://www.apple.com/certificateauthority/AppleWWDRCAG3.cer
           # Already-present is not an error worth failing the build over.
           security import "$RUNNER_TEMP/wwdr.cer" -k "$KEYCHAIN" -T /usr/bin/codesign || true
@@ -317,7 +404,7 @@ jobs:
       - name: Verify a usable signing identity
         if: env.APPLE_CERTIFICATE_P12 != ''
         run: |
-          set -euxo pipefail
+          set -euo pipefail
           security find-identity -v -p codesigning "$KEYCHAIN"
           security find-identity -v -p codesigning "$KEYCHAIN" | grep -q "Apple Distribution"
 
@@ -346,6 +433,9 @@ jobs:
             -exportPath "$RUNNER_TEMP/export"
         working-directory: ios/App
 
+      - name: Inspect the exported store app
+        run: python3 scripts/ci/verify-ios-release.py "$RUNNER_TEMP/export/XpressTend.ipa" "${{ github.run_number }}"
+
       - name: Upload the IPA
         if: env.APPLE_CERTIFICATE_P12 != ''
         uses: actions/upload-artifact@v4
@@ -359,6 +449,8 @@ jobs:
         if: env.APPSTORE_PRIVATE_KEY != ''
         run: |
           set -euo pipefail
+          KEY_PATH="$HOME/.appstoreconnect/private_keys/AuthKey_${APPSTORE_KEY_ID}.p8"
+          trap 'rm -f "$KEY_PATH"' EXIT
           # altool reads the key from this fixed location, named for the key id.
           mkdir -p ~/.appstoreconnect/private_keys
           scripts/ci/decode-base64-secret.sh APPSTORE_PRIVATE_KEY \
@@ -376,10 +468,23 @@ jobs:
           xcrun altool --upload-app -f "$IPA" -t ios \
             --apiKey "$APPSTORE_KEY_ID" --apiIssuer "$APPSTORE_ISSUER_ID"
 
+          node scripts/ci/inspect-app-store-build.mjs "$KEY_PATH" "${{ github.run_number }}"
+
           rm -f ~/.appstoreconnect/private_keys/AuthKey_${APPSTORE_KEY_ID}.p8
-          echo "Uploaded. Processing in App Store Connect usually takes 10 to 15 minutes."
+          echo "Uploaded and Apple processing verified."
 
       - name: Say why TestFlight was skipped
         if: env.APPSTORE_PRIVATE_KEY == ''
         run: |
           echo "::notice::IPA built but not uploaded: App Store Connect API key secrets are not set."
+
+      - name: Remove temporary signing material
+        if: always()
+        run: |
+          set -euo pipefail
+          rm -f "$RUNNER_TEMP/cert.p12" "$RUNNER_TEMP/wwdr.cer"
+          rm -f "$HOME/Library/MobileDevice/Provisioning Profiles/XpressTend.mobileprovision"
+          if [ -n "${APPSTORE_KEY_ID:-}" ]; then
+            rm -f "$HOME/.appstoreconnect/private_keys/AuthKey_${APPSTORE_KEY_ID}.p8"
+          fi
+          if [ -n "${KEYCHAIN:-}" ]; then security delete-keychain "$KEYCHAIN" || true; fi

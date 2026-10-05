@@ -4,6 +4,8 @@ import { audit } from './audit'
 import type { Env, Vars } from './env'
 import { issueAdminSession, issueUserSession, requireAdmin, requireUser, revokeAdminSession, revokeUserSession } from './sessions'
 import { LOGIN_IP_LIMIT, REGISTER_IP_LIMIT, callerKey, overLimit } from './ratelimit'
+import { customerLifecycle } from './routes-customer-lifecycle'
+import { customerPasswordProblem } from './customer-lifecycle'
 
 /** Five bad attempts, then a fifteen-minute lock on that account. */
 const MAX_FAILED_LOGINS = 5
@@ -11,14 +13,8 @@ const LOCKOUT_MINUTES = 15
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
-function passwordProblem(pw: string): string | null {
-  if (pw.length < 12) return 'Password must be at least 12 characters.'
-  if (!/[a-z]/.test(pw) || !/[A-Z]/.test(pw)) return 'Password must mix upper and lower case.'
-  if (!/[0-9]/.test(pw)) return 'Password must contain a number.'
-  return null
-}
-
 export const auth = new Hono<{ Bindings: Env; Variables: Vars }>()
+auth.route('/', customerLifecycle)
 
 auth.post('/register', async (c) => {
   if (await overLimit(c.env, 'register', callerKey(c.req.raw), REGISTER_IP_LIMIT)) {
@@ -35,7 +31,7 @@ auth.post('/register', async (c) => {
 
   if (!EMAIL_RE.test(email)) return c.json({ error: 'invalid_email' }, 400)
   if (!firstName || !lastName) return c.json({ error: 'name_required' }, 400)
-  const pwProblem = passwordProblem(password)
+  const pwProblem = customerPasswordProblem(password)
   if (pwProblem) return c.json({ error: 'weak_password', message: pwProblem }, 400)
 
   const existing = await c.env.DB.prepare(`SELECT id FROM users WHERE lower(email) = ?`).bind(email).first()
@@ -50,20 +46,21 @@ auth.post('/register', async (c) => {
   const id = newId('usr')
   const now = new Date().toISOString()
 
-  await c.env.DB.prepare(
+  const inserted = await c.env.DB.prepare(
     `INSERT INTO users (id, email, password_hash, password_salt, password_iterations,
                         first_name, last_name, preferred_language, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT DO NOTHING`,
   )
     .bind(id, email, hash, salt, PBKDF2_ITERATIONS, firstName, lastName, body.language ?? 'en', now, now)
     .run()
+  if (inserted.meta.changes !== 1) return c.json({ ok: true, verificationRequired: true })
 
   await audit(c.env.DB, {
     actorType: 'customer', actorId: id, action: 'user.registered', entityType: 'user', entityId: id,
     ip: c.req.header('cf-connecting-ip'), userAgent: c.req.header('user-agent'),
   })
 
-  await issueUserSession(c, id)
+  if (!await issueUserSession(c, id, hash)) return c.json({ error: 'account_changed' }, 409)
   return c.json({ ok: true, verificationRequired: true })
 })
 
@@ -106,8 +103,8 @@ auth.post('/login', async (c) => {
         ? new Date(Date.now() + LOCKOUT_MINUTES * 60_000).toISOString()
         : null
     await c.env.DB.prepare(
-      `UPDATE users SET failed_login_count = ?, locked_until = ?, updated_at = ? WHERE id = ?`,
-    ).bind(failures, lockedUntil, new Date().toISOString(), row.id).run()
+      `UPDATE users SET failed_login_count = ?, locked_until = ?, updated_at = ? WHERE id = ? AND status='active' AND password_hash=?`,
+    ).bind(failures, lockedUntil, new Date().toISOString(), row.id, row.password_hash).run()
     await audit(c.env.DB, {
       actorType: 'customer', actorId: String(row.id), action: 'user.login_failed',
       entityType: 'user', entityId: String(row.id), metadata: { failures },
@@ -120,10 +117,10 @@ auth.post('/login', async (c) => {
 
   const now = new Date().toISOString()
   await c.env.DB.prepare(
-    `UPDATE users SET failed_login_count = 0, locked_until = NULL, last_login_at = ?, updated_at = ? WHERE id = ?`,
-  ).bind(now, now, row.id).run()
+    `UPDATE users SET failed_login_count = 0, locked_until = NULL, last_login_at = ?, updated_at = ? WHERE id = ? AND status='active' AND password_hash=?`,
+  ).bind(now, now, row.id, row.password_hash).run()
 
-  await issueUserSession(c, String(row.id))
+  if (!await issueUserSession(c, String(row.id), String(row.password_hash))) return fail()
   await audit(c.env.DB, {
     actorType: 'customer', actorId: String(row.id), action: 'user.login',
     entityType: 'user', entityId: String(row.id),

@@ -53,11 +53,8 @@ export function NativeShell() {
     }
   }, [])
 
-  // The same bundle serves xpresstend.com, where pinch zoom stays available as
-  // an accessibility feature. Inside the shell the app must hold native scale:
-  // without a maximum scale, iOS zooms the whole page whenever an input under
-  // 16px is focused — to the person signing in, the app suddenly enlarges.
-  // The `native` class lets the stylesheet strip the remaining webview tells.
+  // Preserve pinch zoom for accessibility. The native stylesheet keeps small
+  // form fields at 16px so focusing them does not trigger iOS input zoom.
   useEffect(() => {
     if (!isNative) return
     document.documentElement.classList.add('native')
@@ -65,7 +62,7 @@ export function NativeShell() {
       .querySelector('meta[name="viewport"]')
       ?.setAttribute(
         'content',
-        'width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover',
+        'width=device-width, initial-scale=1.0, viewport-fit=cover',
       )
   }, [])
 
@@ -78,6 +75,7 @@ export function NativeShell() {
   // screen, which mid-transfer reads as losing the money.
   useEffect(() => {
     if (!isNative) return
+    let disposed = false
     let remove: (() => void) | undefined
     void CapApp.addListener('backButton', ({ canGoBack }) => {
       if (canGoBack && location.pathname !== '/') {
@@ -86,20 +84,25 @@ export function NativeShell() {
         void CapApp.exitApp()
       }
     }).then((handle) => {
-      remove = () => void handle.remove()
+      if (disposed) void handle.remove()
+      else remove = () => void handle.remove()
     })
-    return () => remove?.()
+    return () => { disposed = true; remove?.() }
   }, [location.pathname, navigate])
 
   useEffect(() => {
+    let disposed = false
     let remove: (() => void) | undefined
-    void Network.getStatus().then((status) => setOffline(!status.connected))
+    void Network.getStatus().then((status) => {
+      if (!disposed) setOffline(!status.connected)
+    }).catch(() => { /* A missing network plugin must not prevent launch. */ })
     void Network.addListener('networkStatusChange', (status) => {
-      setOffline(!status.connected)
+      if (!disposed) setOffline(!status.connected)
     }).then((handle) => {
-      remove = () => void handle.remove()
-    })
-    return () => remove?.()
+      if (disposed) void handle.remove()
+      else remove = () => void handle.remove()
+    }).catch(() => { /* Offline notices are best-effort when unsupported. */ })
+    return () => { disposed = true; remove?.() }
   }, [])
 
   return (
