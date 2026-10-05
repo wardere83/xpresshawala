@@ -11,14 +11,20 @@ SDK_ROOT=${ANDROID_HOME:-${ANDROID_SDK_ROOT:?Android SDK is required}}
 BUILD_TOOLS="$SDK_ROOT/build-tools/$(ls "$SDK_ROOT/build-tools" | sort -V | tail -1)"
 CHECK_DIR=$(mktemp -d)
 trap 'rm -rf "$CHECK_DIR"' EXIT
-test -s "$APK"
-test -s "$AAB"
+test -s "$APK" || { echo '::error::The signed release APK was not produced at the expected path.'; exit 1; }
+test -s "$AAB" || { echo '::error::The signed release App Bundle was not produced at the expected path.'; exit 1; }
 
-"$BUILD_TOOLS/apksigner" verify --verbose --print-certs "$APK" > "$CHECK_DIR/apk-signature"
-grep -Fq "Signer #1 certificate SHA-256 digest: $EXPECTED_CERT" "$CHECK_DIR/apk-signature"
+if ! "$BUILD_TOOLS/apksigner" verify --verbose --print-certs "$APK" > "$CHECK_DIR/apk-signature" 2>&1; then
+  echo '::error::APK cryptographic signature verification failed.'
+  exit 1
+fi
+ACTUAL_CERT=$(sed -n 's/^Signer #1 certificate SHA-256 digest: //p' "$CHECK_DIR/apk-signature")
+echo "APK signing certificate SHA-256: $ACTUAL_CERT"
+test "$ACTUAL_CERT" = "$EXPECTED_CERT" || { echo '::error::The APK signer differs from the existing XpressTend upload certificate.'; exit 1; }
 "$BUILD_TOOLS/aapt" dump badging "$APK" > "$CHECK_DIR/apk-metadata"
-grep -Fq "package: name='com.xpresstend.app' versionCode='$EXPECTED_VERSION'" "$CHECK_DIR/apk-metadata"
-grep -Fq "targetSdkVersion:'36'" "$CHECK_DIR/apk-metadata"
+sed -n "/^package:/p; /^targetSdkVersion:/p" "$CHECK_DIR/apk-metadata"
+grep -Fq "package: name='com.xpresstend.app' versionCode='$EXPECTED_VERSION'" "$CHECK_DIR/apk-metadata" || { echo '::error::The APK package or release build number is incorrect.'; exit 1; }
+grep -Fq "targetSdkVersion:'36'" "$CHECK_DIR/apk-metadata" || { echo '::error::The APK target SDK is incorrect.'; exit 1; }
 if grep -q 'application-debuggable' "$CHECK_DIR/apk-metadata"; then
   echo '::error::A debuggable APK cannot be published.'
   exit 1
@@ -35,6 +41,7 @@ if grep -Eiq 'unsigned|not signed|weak|disabled algorithm' "$CHECK_DIR/bundle-si
 fi
 keytool -J-Duser.language=en -printcert -jarfile "$AAB" > "$CHECK_DIR/bundle-certificate"
 BUNDLE_CERT=$(sed -n 's/^[[:space:]]*SHA256:[[:space:]]*//p' "$CHECK_DIR/bundle-certificate" | head -1 | tr -d ':' | tr '[:upper:]' '[:lower:]')
-test "$BUNDLE_CERT" = "$EXPECTED_CERT"
+echo "App Bundle signing certificate SHA-256: $BUNDLE_CERT"
+test "$BUNDLE_CERT" = "$EXPECTED_CERT" || { echo '::error::The App Bundle signer differs from the existing XpressTend upload certificate.'; exit 1; }
 sha256sum "$APK" "$AAB"
 echo "Verified signed release APK and Play App Bundle, build $EXPECTED_VERSION."

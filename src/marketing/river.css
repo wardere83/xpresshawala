@@ -1,0 +1,103 @@
+.xt-river {
+  display: block;
+  width: 200px;
+  max-width: 100%;
+  height: auto;
+  aspect-ratio: 1;
+  justify-self: center;
+  overflow: hidden;
+  pointer-events: none;
+}
+.xt-river-outer-ring,
+.xt-river-rim,
+.xt-river-contours,
+.xt-river-banks,
+.xt-river-currents,
+.xt-river-ripples {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.xt-river-outer-ring {
+  stroke: #4bd1d3;
+  stroke-width: 0.6;
+  opacity: 0.16;
+}
+.xt-river-rim {
+  stroke: #4bd1d3;
+  stroke-width: 1;
+  opacity: 0.5;
+}
+.xt-river-contours {
+  stroke: #4bd1d3;
+  stroke-width: 0.8;
+  opacity: 0.18;
+}
+.xt-river-banks {
+  stroke: #79d6d4;
+  stroke-width: 1.45;
+  opacity: 0.8;
+}
+.xt-river-currents {
+  stroke: #b2eee7;
+  stroke-width: 1.2;
+  opacity: 0.56;
+}
+.xt-river-current {
+  stroke-dasharray: 4 11 1 9;
+  animation: xt-river-current 10s linear infinite;
+}
+.xt-river-current:nth-child(2) {
+  animation-duration: 12s;
+  animation-delay: -4s;
+  opacity: 0.75;
+}
+.xt-river-current:nth-child(3) {
+  animation-duration: 11s;
+  animation-delay: -7s;
+}
+.xt-river-current:nth-child(4) {
+  animation-duration: 14s;
+  animation-delay: -2s;
+  opacity: 0.55;
+}
+.xt-river-ripples {
+  stroke: #c9f2eb;
+  stroke-width: 0.9;
+}
+.xt-river-ripple {
+  opacity: 0.16;
+  animation: xt-river-ripple 7s linear infinite;
+}
+.xt-river-ripple:nth-child(2) {
+  animation-delay: -2.3s;
+}
+.xt-river-ripple:nth-child(3) {
+  animation-delay: -4.6s;
+}
+.xt-river[data-active='false'] .xt-river-motion {
+  animation-play-state: paused;
+}
+@keyframes xt-river-current {
+  to { stroke-dashoffset: -100; }
+}
+@keyframes xt-river-ripple {
+  0% { transform: translateY(-7px); opacity: 0; }
+  25% { opacity: 0.34; }
+  75% { opacity: 0.34; }
+  100% { transform: translateY(12px); opacity: 0; }
+}
+@media (max-width: 1000px) {
+  .xt-river { width: 130px; }
+}
+@media (max-width: 760px) {
+  .xt-river { width: 168px; margin-top: 5px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .xt-river .xt-river-motion {
+    animation: none;
+    transform: none;
+    stroke-dashoffset: 0;
+  }
+  .xt-river .xt-river-ripple { opacity: 0.16; }
+}

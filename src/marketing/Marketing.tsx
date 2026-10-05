@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { ArrowUpRight, Globe2, ShieldCheck, Languages, ScanLine } from 'lucide-react'
+import { ArrowUpRight, ShieldCheck, Languages, ScanLine } from 'lucide-react'
 import { brand } from '../config/brand'
 import { useT } from '../i18n'
 import { LanguageSwitcher } from '../components/LanguageSwitcher'
@@ -10,6 +10,7 @@ import { useBrandCopy } from './brandCopy'
 import { useCorporateCopy } from './corporateCopy'
 import { InteractiveGlobe } from './InteractiveGlobe'
 import { AppShowcase } from './AppShowcase'
+import { RiverFlow } from './RiverFlow'
 import './marketing.css'
 
 export function Marketing() {
@@ -124,7 +125,7 @@ export function Marketing() {
               <Link className="brand-text-link" to="/partners">{copy.partnerLink} <ArrowUpRight size={17} aria-hidden="true" /></Link>
             </div>
           </div>
-          <Globe2 className="corporate-partner-icon" size={164} strokeWidth={0.6} aria-hidden="true" />
+          <RiverFlow />
         </section>
 
         <section className="brand-trust" aria-labelledby="trust-heading">
