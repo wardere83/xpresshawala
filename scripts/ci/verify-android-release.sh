@@ -27,8 +27,12 @@ fi
 
 # Upload certificates are self-signed, so jarsigner -strict's CA-trust errors
 # are inappropriate here. Require verified integrity and the pinned certificate.
-jarsigner -J-Duser.language=en -verify "$AAB" > "$CHECK_DIR/bundle-signature"
+jarsigner -J-Duser.language=en -verify "$AAB" > "$CHECK_DIR/bundle-signature" 2>&1
 grep -Fq 'jar verified.' "$CHECK_DIR/bundle-signature"
+if grep -Eiq 'unsigned|not signed|weak|disabled algorithm' "$CHECK_DIR/bundle-signature"; then
+  echo '::error::App Bundle contains unsigned content or weak signing algorithms.'
+  exit 1
+fi
 keytool -J-Duser.language=en -printcert -jarfile "$AAB" > "$CHECK_DIR/bundle-certificate"
 BUNDLE_CERT=$(sed -n 's/^[[:space:]]*SHA256:[[:space:]]*//p' "$CHECK_DIR/bundle-certificate" | head -1 | tr -d ':' | tr '[:upper:]' '[:lower:]')
 test "$BUNDLE_CERT" = "$EXPECTED_CERT"
