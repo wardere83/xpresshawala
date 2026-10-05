@@ -146,7 +146,7 @@ jobs:
         run: |
           mkdir -p release
           cp android/app/build/outputs/apk/release/app-release.apk release/xpresstend.apk
-          sha256sum release/xpresstend.apk > release/SHA256SUMS
+          (cd release && sha256sum xpresstend.apk > SHA256SUMS)
       - name: Publish the verified rolling download
         uses: softprops/action-gh-release@v2
         with:

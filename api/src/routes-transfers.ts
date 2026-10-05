@@ -16,6 +16,7 @@ import {
   screeningClaimGuard,
   screeningFailure,
   transferScreeningStatements,
+  transferLimitClaimGuard,
   type TransferScreening,
 } from './compliance'
 
@@ -226,6 +227,7 @@ transfers.post('/transfers', async (c) => {
     : 'awaiting_payment'
 
   const creationGuard = { sql: `EXISTS (SELECT 1 FROM transfers WHERE id=?)`, values: [id] }
+  const limitGuard = transferLimitClaimGuard(user.id, screening.subjects.kycTier, q.sendAmountMinor, now)
   const sessionHash = await hashToken(getCookie(c, USER_COOKIE) ?? '')
   const creation = await c.env.DB.batch([
     c.env.DB.prepare(
@@ -236,12 +238,13 @@ transfers.post('/transfers', async (c) => {
         WHERE u.id=? AND u.status='active' AND u.kyc_status='verified' AND u.kyc_tier=?
           AND u.first_name=? AND u.last_name=? AND r.id=? AND r.archived_at IS NULL
           AND r.full_name=? AND r.country=?
-          AND EXISTS (SELECT 1 FROM sessions s WHERE s.user_id=u.id AND s.token_hash=? AND s.revoked_at IS NULL AND s.expires_at>?)`,
+          AND EXISTS (SELECT 1 FROM sessions s WHERE s.user_id=u.id AND s.token_hash=? AND s.revoked_at IS NULL AND s.expires_at>?)
+          ${limitGuard.sql}`,
     ).bind(id, ref, corridor.id, q.sendAmountMinor, q.sendCurrency,
            q.feeMinor, q.receiveAmountMinor, q.receiveCurrency, q.effectiveRateE8, startStatus,
            new Date(Date.now() + QUOTE_TTL_MINUTES * 60_000).toISOString(), now, now,
            user.id, screening.subjects.kycTier, screening.subjects.firstName, screening.subjects.lastName,
-           b.recipientId, screening.subjects.recipient.name, corridor.receive_country, sessionHash, now),
+           b.recipientId, screening.subjects.recipient.name, corridor.receive_country, sessionHash, now, ...limitGuard.values),
     ...transferScreeningStatements(c.env, id, screening, 'creation', creationGuard),
     c.env.DB.prepare(
       `INSERT INTO transfer_events (id, transfer_id, from_status, to_status, actor_type, actor_id, note, created_at)
@@ -249,7 +252,14 @@ transfers.post('/transfers', async (c) => {
     ).bind(newId('tev'), id, startStatus, user.id,
            flags.length ? `Reporting flags: ${flags.join(', ')}` : null, now, ...creationGuard.values),
   ])
-  if (creation[0]?.meta.changes !== 1) return c.json({ error: 'account_changed' }, 409)
+  if (creation[0]?.meta.changes !== 1) {
+    const currentLimit = await checkLimits(c.env, user.id, screening.subjects.kycTier, q.sendAmountMinor)
+    if (!currentLimit.allowed) return c.json({
+      error: currentLimit.reason, limitMinor: currentLimit.limitMinor, usedMinor: currentLimit.usedMinor,
+      message: 'Your remaining transfer allowance changed. This transfer would exceed your current limit.',
+    }, 403)
+    return c.json({ error: 'account_changed', message: 'Account or transfer details changed. Please try again.' }, 409)
+  }
 
   await audit(c.env.DB, {
     actorType: 'customer', actorId: user.id, action: 'transfer.created',

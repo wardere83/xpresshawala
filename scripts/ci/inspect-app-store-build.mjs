@@ -9,7 +9,7 @@ if (!privateKeyPath || !buildNumber || !process.env.APPSTORE_KEY_ID || !process.
 }
 const issued = Math.floor(Date.now() / 1000)
 const encode = value => Buffer.from(JSON.stringify(value)).toString('base64url')
-const message = `${encode({ alg: 'ES256', kid: process.env.APPSTORE_KEY_ID, typ: 'JWT' })}.${encode({ iss: process.env.APPSTORE_ISSUER_ID, iat: issued, exp: issued + 900, aud: 'appstoreconnect-v1' })}`
+const message = `${encode({ alg: 'ES256', kid: process.env.APPSTORE_KEY_ID, typ: 'JWT' })}.${encode({ iss: process.env.APPSTORE_ISSUER_ID, iat: issued, exp: issued + 1200, aud: 'appstoreconnect-v1' })}`
 const signature = sign('sha256', Buffer.from(message), { key: readFileSync(privateKeyPath), dsaEncoding: 'ieee-p1363' }).toString('base64url')
 const token = `${message}.${signature}`
 
@@ -30,7 +30,8 @@ console.log(JSON.stringify({ appId: 'com.xpresstend.app', storeVersions: version
 })) }))
 
 let state = 'NOT_YET_VISIBLE'
-for (let attempt = 0; attempt < 7; attempt++) {
+const deadline = Date.now() + 15 * 60_000
+while (Date.now() < deadline) {
   const builds = await get('builds', { 'filter[app]': app.id, 'filter[version]': buildNumber, limit: '5' })
   const build = builds.data?.[0]
   state = build?.attributes.processingState ?? 'NOT_YET_VISIBLE'
@@ -40,7 +41,7 @@ for (let attempt = 0; attempt < 7; attempt++) {
     if (build.attributes.expired) throw new Error('The uploaded build is expired.')
     process.exit(0)
   }
-  if (attempt < 6) await new Promise(resolve => setTimeout(resolve, 20_000))
+  await new Promise(resolve => setTimeout(resolve, Math.min(20_000, Math.max(0, deadline - Date.now()))))
 }
 console.log(JSON.stringify({ build: buildNumber, processingState: state }))
-console.log('::notice::The IPA upload succeeded; Apple processing must finish before installation or submission.')
+throw new Error('The IPA uploaded, but Apple processing did not complete within 15 minutes. Check App Store Connect before treating this as an installable release.')

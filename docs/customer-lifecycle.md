@@ -47,7 +47,9 @@ This requires no payment/payout provider or reference, paid timestamp, posting
 marker, or ledger entry. Other open transfers and any inconsistent or
 unsettled monetary record block deletion. In particular, a funded transfer marked `failed`
 still blocks deletion when funds have not been reconciled: a terminal label is
-not evidence of a refund. Payable balances are checked per transfer and currency
+not evidence of a refund. Any provider/payment/payout reference without a paid timestamp blocks
+deletion, including on a `failed`, `cancelled` or `refunded` transfer, until the
+provider operation is reconciled. Payable balances are checked per transfer and currency
 so unrelated balances cannot offset one another. Posting markers must link to
 ledger records, ledger groups must balance, and paid transfers require funding
 and payout evidence. No refund mechanism is claimed by these checks.

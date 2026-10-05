@@ -255,6 +255,58 @@ test('pending transfers and unresolved monetary evidence block account deletion 
   }
 })
 
+test('terminal transfer status cannot discard unresolved external provider evidence', async (t) => {
+  for (const [status, field] of [
+    ['failed', 'payment_provider'], ['cancelled', 'payment_intent_id'],
+    ['refunded', 'payout_provider'], ['failed', 'payout_reference'],
+  ]) {
+    await t.test(`${status} ${field}`, async (context) => {
+      const f = await setup(context)
+      const id = seedTransfer(f.db, 'provider-pending', status)
+      f.db.sqlite.prepare(`UPDATE transfers SET ${field}='unresolved-provider-operation' WHERE id=?`).run(id)
+      const response = await f.erase()
+      assert.equal(response.status, 409)
+      assert.equal(response.body.error, 'account_deletion_blocked')
+      assert.equal(f.db.sqlite.prepare('SELECT status FROM users').get()!.status, 'active')
+      assert.equal(f.db.sqlite.prepare('SELECT COUNT(*) AS n FROM customer_account_deletions').get()!.n, 0)
+      assert.equal(f.db.sqlite.prepare('SELECT COUNT(*) AS n FROM ledger_entries').get()!.n, 0)
+    })
+  }
+})
+
+test('a concurrently created transfer cannot exceed daily value, monthly value or daily count limits', async (t) => {
+  for (const scenario of ['over_daily', 'over_monthly', 'over_daily_count']) {
+    await t.test(scenario, async (context) => {
+      const f = await setup(context)
+      const earlier = new Date(Date.now() - 2 * 24 * 3600_000).toISOString()
+      const existing = scenario === 'over_daily' ? 1 : scenario === 'over_monthly' ? 9 : 4
+      function addCountedTransfer(id: string, date = new Date().toISOString()) {
+        seedTransfer(f.db, id, 'awaiting_payment')
+        f.db.sqlite.prepare('UPDATE transfers SET send_amount_minor=?,created_at=? WHERE id=?')
+          .run(scenario === 'over_daily_count' ? 1000 : 100000, date, id)
+      }
+      for (let index = 0; index < existing; index++) {
+        addCountedTransfer(`existing-${index}`, scenario === 'over_monthly' ? earlier : undefined)
+      }
+      let injected = false
+      f.db.beforeExecute = (sql) => {
+        if (!sql.startsWith('INSERT INTO transfers ')) return
+        f.db.beforeExecute = undefined
+        injected = true
+        addCountedTransfer('concurrent-transfer')
+      }
+      const response = await f.create()
+      assert.ok(injected, 'the competing transfer arrives after the initial limit check')
+      assert.equal(response.status, 403)
+      assert.equal(response.body.error, scenario)
+      assert.equal(f.db.sqlite.prepare('SELECT COUNT(*) AS n FROM transfers').get()!.n, existing + 1)
+      assert.equal(f.db.sqlite.prepare('SELECT COUNT(*) AS n FROM sanctions_screenings').get()!.n, 0)
+      assert.equal(f.db.sqlite.prepare('SELECT COUNT(*) AS n FROM transfer_events').get()!.n, 0)
+      assert.equal(f.db.sqlite.prepare("SELECT COUNT(*) AS n FROM audit_log WHERE action='transfer.created'").get()!.n, 0)
+    })
+  }
+})
+
 test('changes between deletion authorization and claim cannot close a customer account', async (t) => {
   for (const scenario of ['new-transfer', 'revoked-session', 'changed-password']) {
     await t.test(scenario, async (context) => {

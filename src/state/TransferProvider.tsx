@@ -15,6 +15,19 @@ const emptyRecipient: ReturnType<typeof getRecipient> = {
   corridorCode: '', favourite: false, relation: '', relationI18n: {}, hue: 180,
 }
 type CreatedTransfer = ApiQuote & { id: string; reference: string; status: string }
+type PendingPayment = {
+  transfer: CreatedTransfer
+  // The reviewed quote expires no later than the subsequently created record.
+  // Once this lower bound passes, inspect the server's exact expiry before pay.
+  reviewedUntil: number
+  uncertainPayment: boolean
+}
+type TransferPaymentState = {
+  id: string
+  status: string
+  paid_at: string | null
+  quote_expires_at: string | null
+}
 
 function quoteView(q: ApiQuote): Quote {
   return {
@@ -48,7 +61,7 @@ export function TransferProvider({ children }: { children: ReactNode }) {
   const [serverQuote, setServerQuote] = useState<{ key: string; quote: ApiQuote } | null>(null)
   const [quoteFailure, setQuoteFailure] = useState<{ key: string; message: string } | null>(null)
   const [quoteRevision, setQuoteRevision] = useState(0)
-  const pendingPayments = useRef(new Map<string, CreatedTransfer>())
+  const pendingPayments = useRef(new Map<string, PendingPayment>())
   const ambiguousCreations = useRef(new Set<string>())
   const committing = useRef(false)
   const mineSelected = live ? mine.find((r) => r.id === recipientId) : undefined
@@ -127,14 +140,30 @@ export function TransferProvider({ children }: { children: ReactNode }) {
     try {
       if (!isDemo) {
         if (availableError || !account || !mineSelected || !liveCorridor || !currentQuote) throw new Error(availableError ?? 'A test transfer is currently unavailable.')
+        if (!password) throw new Error('Enter your account password to authorize this test.')
+        if (ambiguousCreations.current.has(quoteKey)) throw new Error('The previous transfer request could not be confirmed. Check your activity before creating another test.')
+        let pending = pendingPayments.current.get(quoteKey)
+        if (pending && pending.reviewedUntil <= Date.now()) {
+          const { transfer: state } = await api.get<{ transfer: TransferPaymentState }>(`/transfers/${pending.transfer.id}`)
+          if (!state || state.id !== pending.transfer.id || state.paid_at !== null
+            || !['awaiting_payment', 'compliance_hold'].includes(state.status)) {
+            throw new Error('The earlier payment status must be checked in your activity before another test can be created.')
+          }
+          const expiresAt = typeof state.quote_expires_at === 'string' ? Date.parse(state.quote_expires_at) : NaN
+          if (!Number.isFinite(expiresAt)) throw new Error('The earlier transfer expiry could not be verified. Check your activity before trying again.')
+          if (expiresAt <= Date.now()) {
+            if (pending.uncertainPayment) throw new Error('The earlier payment result could not be confirmed. Check your activity before creating another test.')
+            pendingPayments.current.delete(quoteKey)
+            setServerQuote(null); setQuoteFailure(null); setQuoteRevision((revision) => revision + 1)
+            throw new Error('The earlier test quote expired. A new quote is being requested; review it before trying again.')
+          }
+          pending.reviewedUntil = expiresAt
+        }
         if (Date.parse(currentQuote.expiresAt) <= Date.now()) {
           setServerQuote(null); setQuoteFailure(null); setQuoteRevision((revision) => revision + 1)
           throw new Error('Your quote expired. A new test quote is being requested; review it before continuing.')
         }
-        if (!password) throw new Error('Enter your account password to authorize this test.')
-        if (ambiguousCreations.current.has(quoteKey)) throw new Error('The previous transfer request could not be confirmed. Check your activity before creating another test.')
-        let created = pendingPayments.current.get(quoteKey)
-        if (!created) {
+        if (!pending) {
           try {
             const response = await api.post<{ transfer: CreatedTransfer }>('/transfers', {
               corridorId: liveCorridor.id, recipientId: mineSelected.id, sendAmountMinor: Math.round(amountUsd * 100),
@@ -143,8 +172,8 @@ export function TransferProvider({ children }: { children: ReactNode }) {
               ambiguousCreations.current.add(quoteKey)
               throw new Error('The transfer could not be verified. Check your activity before trying again.')
             }
-            created = response.transfer
-            pendingPayments.current.set(quoteKey, created)
+            pending = { transfer: response.transfer, reviewedUntil: Date.parse(currentQuote.expiresAt), uncertainPayment: false }
+            pendingPayments.current.set(quoteKey, pending)
           } catch (err) {
             if (err instanceof ApiError && (err.status === 0 || err.status >= 500)) {
               ambiguousCreations.current.add(quoteKey)
@@ -153,7 +182,24 @@ export function TransferProvider({ children }: { children: ReactNode }) {
             throw err
           }
         }
-        const paid = await api.post<{ ok: boolean; status: string; testMode: boolean }>(`/transfers/${created.id}/pay`, { password })
+        const created = pending.transfer
+        const previouslyUncertain = pending.uncertainPayment
+        pending.uncertainPayment = true
+        let paid: { ok: boolean; status: string; testMode: boolean }
+        try {
+          paid = await api.post(`/transfers/${created.id}/pay`, { password })
+        } catch (err) {
+          if (!previouslyUncertain && err instanceof ApiError
+            && ((err.code === 'authorization_failed' && err.status === 401) || (err.code === 'quote_expired' && err.status === 409))) {
+            pending.uncertainPayment = false
+            if (err.code === 'quote_expired') {
+              pendingPayments.current.delete(quoteKey)
+              setServerQuote(null); setQuoteFailure(null); setQuoteRevision((revision) => revision + 1)
+              throw new Error('The earlier test quote expired. A new quote is being requested; review it before trying again.')
+            }
+          }
+          throw err
+        }
         if (paid.ok !== true || paid.testMode !== true || typeof paid.status !== 'string') throw new Error('The test transfer status could not be verified. Check your activity.')
         const q = quoteView(created)
         const tx: Transaction = { id: created.id, recipientId: mineSelected.id, amountUsd: q.amountUsd, fee: q.fee, date: new Date().toISOString(), status: 'pending', reference: created.reference }

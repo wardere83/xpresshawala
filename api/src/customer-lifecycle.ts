@@ -121,6 +121,11 @@ export const ACCOUNT_FINANCIAL_GUARD = `
   NOT EXISTS (SELECT 1 FROM transfers t WHERE t.user_id=u.id
     AND t.status NOT IN ('completed','failed','cancelled','refunded') AND NOT (${UNFUNDED_CANCELABLE}))
   AND NOT EXISTS (
+    SELECT 1 FROM transfers t WHERE t.user_id=u.id AND t.paid_at IS NULL AND
+      (t.payment_provider IS NOT NULL OR t.payment_intent_id IS NOT NULL
+       OR t.payout_provider IS NOT NULL OR t.payout_reference IS NOT NULL)
+  )
+  AND NOT EXISTS (
     SELECT 1 FROM ledger_entries l JOIN transfers t ON t.id=l.transfer_id
      WHERE t.user_id=u.id AND l.account_code='payout_payable'
      GROUP BY l.transfer_id,l.currency HAVING SUM(l.amount_minor)<>0

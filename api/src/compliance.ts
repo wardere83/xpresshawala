@@ -31,6 +31,32 @@ export const TIER_LIMITS: Record<number, TierLimits> = {
   3: { perTransfer: 2_000_000, daily: 5_000_000, monthly: 20_000_000, dailyCount: 20 },
 }
 
+const COUNTED_TRANSFERS = `status NOT IN ('failed', 'cancelled', 'draft')`
+
+/**
+ * Repeat all allowance checks in the INSERT itself. D1 serializes writers,
+ * so simultaneous requests cannot each reserve the same remaining allowance.
+ * The caller also binds this tier to the current verified user in that INSERT.
+ */
+export function transferLimitClaimGuard(userId: string, tier: number, amountMinor: number, now: string): { sql: string; values: (string | number)[] } {
+  const limits = Number.isInteger(tier) ? TIER_LIMITS[tier] ?? TIER_LIMITS[0] : TIER_LIMITS[0]
+  const dayAgo = new Date(Date.parse(now) - 24 * 3600_000).toISOString()
+  const monthAgo = new Date(Date.parse(now) - 30 * 24 * 3600_000).toISOString()
+  return {
+    sql: `
+      AND ? > 0 AND ? <= ?
+      AND (SELECT COUNT(*) FROM transfers WHERE user_id=? AND created_at>? AND ${COUNTED_TRANSFERS}) < ?
+      AND (SELECT COALESCE(SUM(send_amount_minor),0) FROM transfers WHERE user_id=? AND created_at>? AND ${COUNTED_TRANSFERS}) + ? <= ?
+      AND (SELECT COALESCE(SUM(send_amount_minor),0) FROM transfers WHERE user_id=? AND created_at>? AND ${COUNTED_TRANSFERS}) + ? <= ?`,
+    values: [
+      amountMinor, amountMinor, limits.perTransfer,
+      userId, dayAgo, limits.dailyCount,
+      userId, dayAgo, amountMinor, limits.daily,
+      userId, monthAgo, amountMinor, limits.monthly,
+    ],
+  }
+}
+
 /** Amount-based recordkeeping and operational review flags, in USD minor units.
  * Transfer value alone does not establish a Currency Transaction Report duty;
  * currency transactions and applicable aggregation rules require separate review.
@@ -66,7 +92,7 @@ export async function checkLimits(
   const monthAgo = new Date(Date.now() - 30 * 24 * 3600_000).toISOString()
 
   // Cancelled and failed transfers do not consume an allowance.
-  const counted = `status NOT IN ('failed', 'cancelled', 'draft')`
+  const counted = COUNTED_TRANSFERS
 
   const day = await env.DB.prepare(
     `SELECT COALESCE(SUM(send_amount_minor), 0) AS total, COUNT(*) AS n
