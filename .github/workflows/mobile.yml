@@ -164,9 +164,16 @@ jobs:
   ios:
     name: iOS (compile check)
     needs: quality
-    runs-on: macos-15
+    runs-on: macos-26
     steps:
       - uses: actions/checkout@v4
+
+      - name: Select the current Xcode toolchain
+        run: |
+          set -euo pipefail
+          NEWEST=$(ls -d /Applications/Xcode*.app | sort -V | tail -1)
+          sudo xcode-select -s "$NEWEST/Contents/Developer"
+          xcodebuild -version
 
       - uses: actions/setup-node@v4
         with:
