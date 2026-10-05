@@ -23,6 +23,14 @@ export type Quote = {
   currency: string
 }
 
+export type TransferReceipt = {
+  transaction: Transaction
+  recipient: ReturnType<typeof getRecipient>
+  quote: Quote
+  isDemo: boolean
+  status: string
+}
+
 export type TransferValue = {
   recipientId: string
   setRecipientId: (id: string) => void
@@ -37,6 +45,7 @@ export type TransferValue = {
   quote: Quote
   history: Transaction[]
   lastTransaction: Transaction | null
+  lastReceipt: TransferReceipt | null
   /**
    * Records the transfer. For a signed-in customer this creates it through the
    * API and captures the (test-mode) payment, so it lands in the compliance
@@ -49,6 +58,9 @@ export type TransferValue = {
   live: boolean
   /** Set when a real transfer could not be created. */
   commitError: string | null
+  availableError: string | null
+  quoteReady: boolean
+  quoteLoading: boolean
 }
 
 export const TransferContext = createContext<TransferValue | null>(null)

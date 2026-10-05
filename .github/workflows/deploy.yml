@@ -93,6 +93,11 @@ jobs:
         run: npx wrangler d1 execute xpresstend-production --remote --file=migrations/0007_ofac_sanctions.sql --yes
         working-directory: api
 
+      - name: Prepare customer recovery and account deletion
+        if: env.CLOUDFLARE_API_TOKEN != ''
+        run: npx wrangler d1 execute xpresstend-production --remote --file=migrations/0008_customer_lifecycle.sql --yes
+        working-directory: api
+
       - name: Refresh and validate official Treasury sanctions data
         id: sanctions-data
         if: env.CLOUDFLARE_API_TOKEN != ''
@@ -105,6 +110,21 @@ jobs:
       - name: Deploy the Worker
         if: env.CLOUDFLARE_API_TOKEN != ''
         run: npx wrangler deploy
+        working-directory: api
+
+      - name: Check customer recovery email configuration
+        if: env.CLOUDFLARE_API_TOKEN != ''
+        run: |
+          set -euo pipefail
+          npx wrangler secret list --format json > "$RUNNER_TEMP/worker-secret-names.json"
+          node --input-type=module <<'JS'
+          import { readFileSync } from 'node:fs';
+          const names = new Set(JSON.parse(readFileSync(`${process.env.RUNNER_TEMP}/worker-secret-names.json`, 'utf8')).map(entry => entry.name));
+          const microsoft = ['MS_TENANT_ID', 'MS_CLIENT_ID', 'MS_CLIENT_SECRET'].every(name => names.has(name));
+          const resend = names.has('RESEND_API_KEY');
+          console.log(JSON.stringify({ customerRecoveryEmailConfigured: microsoft || resend, provider: microsoft ? 'microsoft-graph' : resend ? 'resend' : null }));
+          if (!microsoft && !resend) console.log('::warning::Customer password recovery needs a configured transactional email provider before public app release.');
+          JS
         working-directory: api
 
       - name: Verify the deployed official sanctions dataset

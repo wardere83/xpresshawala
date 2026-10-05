@@ -13,8 +13,8 @@ export interface Env {
   ADMIN_BOOTSTRAP_SECRET?: string
   /**
    * Transactional email. Two transports; whichever is configured is used, and
-   * Microsoft wins if both are. With neither, invites and password resets fall
-   * back to an owner handing over a link.
+   * Microsoft wins if both are. Staff invites/resets can use an authenticated
+   * owner-issued link. Customer reset capabilities are delivered only by email.
    *
    * Microsoft 365 via Graph is the one the domain is set up for: the MX points
    * at Outlook and SPF ends in `-all` authorising only Microsoft, so mail sent
@@ -43,6 +43,7 @@ export interface SessionUser {
   kycStatus: string
   kycTier: number
   status: string
+  createdAt: string
 }
 
 export interface SessionAdmin {

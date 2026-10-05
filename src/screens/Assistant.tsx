@@ -6,6 +6,8 @@ import { useI18n, useMirrorClass } from '../i18n'
 import { useTransfer } from '../state/TransferContext'
 import { maskedWallet, rate as fmtRate, usd } from '../lib/format'
 import { corridorName } from '../data/mock'
+import { useAuth } from '../auth/AuthContext'
+import { Unavailable } from './Unavailable'
 
 type Message = {
   id: number
@@ -22,6 +24,11 @@ function liveTime() {
 }
 
 export function Assistant() {
+  const { isDemo } = useAuth()
+  return isDemo ? <DemoAssistant /> : <Unavailable title="Account help" message="The conversational assistant is a product demonstration and does not manage customer accounts. Contact support for account help." to="/support" action="Contact support" />
+}
+
+function DemoAssistant() {
   const { t, lang } = useI18n()
   const mirror = useMirrorClass()
   const navigate = useNavigate()
@@ -152,6 +159,7 @@ export function Assistant() {
 
   return (
     <div className="flex flex-1 flex-col overflow-hidden bg-canvas">
+      <p className="px-4 py-2 text-[12px] text-ink-500">Scripted demo — these are sample conversations.</p>
       {/* Header */}
       <header className="flex shrink-0 items-center gap-2 border-b border-ink-200/60 bg-white px-3 py-2.5">
         <button

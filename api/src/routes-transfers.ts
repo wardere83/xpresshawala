@@ -1,11 +1,12 @@
 import { Hono } from 'hono'
-import { newId, randomHex, verifyPassword } from './crypto'
+import { getCookie } from 'hono/cookie'
+import { hashToken, newId, randomHex, verifyPassword } from './crypto'
 import { audit } from './audit'
 import { fundingPostings } from './ledger'
 import { guardedPostingStatements } from './ledger-db'
 import { QuoteError, quote, type Corridor } from './money'
 import type { Env, Vars } from './env'
-import { requireUser } from './sessions'
+import { requireUser, USER_COOKIE } from './sessions'
 import {
   auditSanctionsUnavailable,
   checkLimits,
@@ -100,12 +101,15 @@ transfers.post('/recipients', async (c) => {
   }
   const id = newId('rcp')
   const now = new Date().toISOString()
-  await c.env.DB.prepare(
+  const sessionHash = await hashToken(getCookie(c, USER_COOKIE) ?? '')
+  const inserted = await c.env.DB.prepare(
     `INSERT INTO recipients (id, user_id, full_name, country, payout_method, phone, account_ref,
                              bank_name, relationship, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-  ).bind(id, user.id, b.fullName.trim(), b.country, b.payoutMethod, b.phone ?? null,
-         b.accountRef ?? null, b.bankName ?? null, b.relationship ?? null, now, now).run()
+     SELECT ?,u.id,?,?,?,?,?,?,?,?,? FROM users u WHERE u.id=? AND u.status='active'
+       AND EXISTS (SELECT 1 FROM sessions s WHERE s.user_id=u.id AND s.token_hash=? AND s.revoked_at IS NULL AND s.expires_at>?)`,
+  ).bind(id, b.fullName.trim(), b.country, b.payoutMethod, b.phone ?? null,
+         b.accountRef ?? null, b.bankName ?? null, b.relationship ?? null, now, now, user.id, sessionHash, now).run()
+  if (inserted.meta.changes !== 1) return c.json({ error: 'account_changed' }, 409)
 
   await audit(c.env.DB, {
     actorType: 'customer', actorId: user.id, action: 'recipient.created',
@@ -211,28 +215,41 @@ transfers.post('/transfers', async (c) => {
     if (failure) return c.json({ error: failure.code, message: failure.message }, failure.status)
     throw error
   }
+  if (screening.subjects.kycTier !== user.kycTier) {
+    const currentLimit = await checkLimits(c.env, user.id, screening.subjects.kycTier, b.sendAmountMinor)
+    if (!currentLimit.allowed) return c.json({ error: currentLimit.reason, limitMinor: currentLimit.limitMinor, usedMinor: currentLimit.usedMinor }, 403)
+  }
   const now = new Date().toISOString()
   const flags = reportingFlags(q.sendAmountMinor)
   const startStatus = screening.blocked || flags.includes('high_value_review')
     ? 'compliance_hold'
     : 'awaiting_payment'
 
-  await c.env.DB.batch([
+  const creationGuard = { sql: `EXISTS (SELECT 1 FROM transfers WHERE id=?)`, values: [id] }
+  const sessionHash = await hashToken(getCookie(c, USER_COOKIE) ?? '')
+  const creation = await c.env.DB.batch([
     c.env.DB.prepare(
       `INSERT INTO transfers (id, reference, user_id, recipient_id, corridor_id,
          send_amount_minor, send_currency, fee_minor, receive_amount_minor, receive_currency,
          fx_rate_e8, status, quote_expires_at, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    ).bind(id, ref, user.id, b.recipientId, corridor.id, q.sendAmountMinor, q.sendCurrency,
+       SELECT ?,?,u.id,r.id,?,?,?,?,?,?,?,?,?,?,? FROM users u JOIN recipients r ON r.user_id=u.id
+        WHERE u.id=? AND u.status='active' AND u.kyc_status='verified' AND u.kyc_tier=?
+          AND u.first_name=? AND u.last_name=? AND r.id=? AND r.archived_at IS NULL
+          AND r.full_name=? AND r.country=?
+          AND EXISTS (SELECT 1 FROM sessions s WHERE s.user_id=u.id AND s.token_hash=? AND s.revoked_at IS NULL AND s.expires_at>?)`,
+    ).bind(id, ref, corridor.id, q.sendAmountMinor, q.sendCurrency,
            q.feeMinor, q.receiveAmountMinor, q.receiveCurrency, q.effectiveRateE8, startStatus,
-           new Date(Date.now() + QUOTE_TTL_MINUTES * 60_000).toISOString(), now, now),
-    ...transferScreeningStatements(c.env, id, screening, 'creation'),
+           new Date(Date.now() + QUOTE_TTL_MINUTES * 60_000).toISOString(), now, now,
+           user.id, screening.subjects.kycTier, screening.subjects.firstName, screening.subjects.lastName,
+           b.recipientId, screening.subjects.recipient.name, corridor.receive_country, sessionHash, now),
+    ...transferScreeningStatements(c.env, id, screening, 'creation', creationGuard),
     c.env.DB.prepare(
       `INSERT INTO transfer_events (id, transfer_id, from_status, to_status, actor_type, actor_id, note, created_at)
-       VALUES (?, ?, NULL, ?, 'customer', ?, ?, ?)`,
+       SELECT ?, ?, NULL, ?, 'customer', ?, ?, ? WHERE ${creationGuard.sql}`,
     ).bind(newId('tev'), id, startStatus, user.id,
-           flags.length ? `Reporting flags: ${flags.join(', ')}` : null, now),
+           flags.length ? `Reporting flags: ${flags.join(', ')}` : null, now, ...creationGuard.values),
   ])
+  if (creation[0]?.meta.changes !== 1) return c.json({ error: 'account_changed' }, 409)
 
   await audit(c.env.DB, {
     actorType: 'customer', actorId: user.id, action: 'transfer.created',
@@ -343,6 +360,7 @@ transfers.post('/transfers/:id/pay', async (c) => {
   }
 
   const guard = screeningClaimGuard(screening, now)
+  const sessionHash = await hashToken(getCookie(c, USER_COOKIE) ?? '')
   const operationReference = `test_${randomHex(8)}`
   const posting = guardedPostingStatements(c.env.DB, id, 'funding', fundingPostings({
     sendAmountMinor: Number(t.send_amount_minor),
@@ -360,8 +378,11 @@ transfers.post('/transfers/:id/pay', async (c) => {
               payment_provider = 'test', payment_intent_id = ?
         WHERE id = ? AND user_id = ? AND status = ? AND paid_at IS NULL
           AND NOT EXISTS (SELECT 1 FROM transfer_postings p WHERE p.transfer_id = transfers.id AND p.kind = 'funding')
+          AND (quote_expires_at IS NULL OR quote_expires_at>?)
+          AND EXISTS (SELECT 1 FROM users u WHERE u.id=transfers.user_id AND u.password_hash=?)
+          AND EXISTS (SELECT 1 FROM sessions s WHERE s.user_id=transfers.user_id AND s.token_hash=? AND s.revoked_at IS NULL AND s.expires_at>?)
           ${guard.sql}`,
-    ).bind(now, now, operationReference, id, user.id, String(t.status), ...guard.values),
+    ).bind(now, now, operationReference, id, user.id, String(t.status), now, creds.password_hash, sessionHash, now, ...guard.values),
     ...posting.statements,
     c.env.DB.prepare(
       `INSERT INTO transfer_events (id, transfer_id, from_status, to_status, actor_type, actor_id, note, created_at)

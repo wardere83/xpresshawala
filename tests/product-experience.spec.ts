@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import { customer, mockAccount } from './fixtures/account'
 
 // Deterministic, offline API fixtures: these checks never touch customer data.
 test.beforeEach(async ({ page }) => {
@@ -144,30 +145,7 @@ test('guest transfer walkthrough completes locally without asking for a real pas
 test('a signed-in empty account never sees the tour recipients or history on Home', async ({
   page,
 }) => {
-  await page.route('**/api/**', (route) => {
-    const endpoint = new URL(route.request().url()).pathname
-    const body = endpoint.endsWith('/auth/me')
-      ? {
-          user: {
-            id: 'customer-test',
-            firstName: 'Taylor',
-            lastName: 'Test',
-            email: 'test@example.com',
-            kycStatus: 'pending',
-            kycTier: 0,
-            status: 'active',
-          },
-        }
-      : endpoint.endsWith('/recipients')
-        ? { recipients: [] }
-        : endpoint.endsWith('/transfers')
-          ? { transfers: [] }
-          : {}
-    return route.fulfill({
-      contentType: 'application/json',
-      body: JSON.stringify(body),
-    })
-  })
+  const requests = await mockAccount(page, { user: { ...customer, kycStatus: 'unverified', kycTier: 0 }, recipients: [] })
   await page.goto('/#/app')
   await expect(page.locator('.product-home-greeting')).toContainText('Taylor')
   await expect(page.getByText('Explore mode · Sample data')).toHaveCount(0)
@@ -175,6 +153,11 @@ test('a signed-in empty account never sees the tour recipients or history on Hom
     page.getByText('Add new recipient', { exact: true }),
   ).toBeVisible()
   await expect(page.locator('.product-home-section ul li')).toHaveCount(0)
+  await page.goto('/#/send')
+  await expect(page.getByRole('button', { name: 'Add new recipient', exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Continue', exact: true })).toHaveCount(0)
+  await expect(page.getByText(/Hooyo|Chase|Visa|Available Balance/)).toHaveCount(0)
+  expect(requests.filter((request) => request.method === 'POST' && request.path.startsWith('/api/transfers'))).toEqual([])
 })
 
 for (const width of [320, 390, 768, 1440]) {
@@ -236,50 +219,16 @@ test('real accounts still require a password before any transfer submission', as
 }) => {
   const writes: string[] = []
   page.on('request', (request) => {
-    if (request.method() === 'POST' && /\/api\//.test(request.url()))
+    if (request.method() === 'POST' && /\/api\/transfers(?:\/|$)/.test(request.url()))
       writes.push(request.url())
   })
-  await page.route('**/api/**', (route) => {
-    const endpoint = new URL(route.request().url()).pathname
-    const body = endpoint.endsWith('/auth/me')
-      ? {
-          user: {
-            id: 'customer-test',
-            firstName: 'Taylor',
-            lastName: 'Test',
-            email: 'test@example.com',
-            kycStatus: 'approved',
-            kycTier: 1,
-            status: 'active',
-          },
-        }
-      : endpoint.endsWith('/recipients')
-        ? {
-            recipients: [
-              {
-                id: 'recipient-test',
-                full_name: 'Test Recipient',
-                country: 'SO',
-                payout_method: 'mobile_wallet',
-                phone: '+252610000000',
-                bank_name: null,
-                relationship: 'Family',
-                created_at: '2026-01-01',
-              },
-            ],
-          }
-        : endpoint.endsWith('/transfers')
-          ? { transfers: [] }
-          : {}
-    return route.fulfill({
-      contentType: 'application/json',
-      body: JSON.stringify(body),
-    })
-  })
+  await mockAccount(page)
   await page.goto('/#/send')
+  await page.getByRole('button', { name: /Choose a recipient/ }).click()
+  await page.getByRole('button', { name: /Test Recipient/ }).click()
   await page.getByRole('button', { name: /Continue/i }).click()
   await expect(page).toHaveURL(/#\/review$/)
-  await page.getByRole('button', { name: /^Send \$/ }).click()
+  await page.getByRole('button', { name: 'Create test transfer', exact: true }).click()
   await expect(page.locator('input[type=password]')).toBeVisible()
   await expect(
     page.getByRole('button', { name: 'Authorise transfer', exact: true }),

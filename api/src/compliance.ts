@@ -242,13 +242,14 @@ export async function screenTransferSubjects(
   }
 }
 
-export function transferScreeningStatements(env: Env, transferId: string, screening: TransferScreening, stage: string): D1PreparedStatement[] {
+export function transferScreeningStatements(env: Env, transferId: string, screening: TransferScreening, stage: string, guard?: { sql: string; values: (string | number)[] }): D1PreparedStatement[] {
   return screening.checks.map(({ subject, result }) => sanctionsScreeningStatement(env, {
     subjectType: subject.subjectType,
     subjectId: subject.subjectId,
     name: subject.name,
     transferId,
     stage,
+    guard,
   }, result))
 }
 

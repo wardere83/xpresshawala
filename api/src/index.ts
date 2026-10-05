@@ -23,6 +23,11 @@ import { getSanctionsStatus } from './sanctions.ts'
  */
 const api = new Hono<{ Bindings: Env; Variables: Vars }>()
 
+api.use('*', async (c, next) => {
+  c.header('Cache-Control', 'no-store')
+  await next()
+})
+
 api.get('/health', async (c) => {
   const row = await c.env.DB.prepare(`SELECT COUNT(*) AS n FROM corridors WHERE enabled = 1`)
     .first<{ n: number }>()
@@ -187,6 +192,8 @@ export default {
       '/app': '/#/app',
       '/login': '/#/login',
       '/register': '/#/register',
+      '/forgot-password': '/#/forgot-password',
+      '/delete-account': '/#/delete-account',
     }
     const target = CLEAN_ROUTES[pathname.replace(/\/$/, '')]
     if (target) {

@@ -42,7 +42,7 @@ export const FORGOT_ACCOUNT_LIMIT: Limit = { max: 5, windowSeconds: 3600 }
  * Fails open on a storage error: a rate limiter that takes the whole service
  * down when its own table misbehaves is worse than the abuse it prevents.
  */
-export async function overLimit(env: Env, bucket: string, key: string, limit: Limit): Promise<boolean> {
+export async function overLimit(env: Env, bucket: string, key: string, limit: Limit, failClosed = false): Promise<boolean> {
   const now = Date.now()
   const windowStart = new Date(now - limit.windowSeconds * 1000).toISOString()
   const id = `${bucket}:${key}`
@@ -65,7 +65,7 @@ export async function overLimit(env: Env, bucket: string, key: string, limit: Li
     return (row?.n ?? 0) > limit.max
   } catch (err) {
     console.error('rate limit check failed', err)
-    return false
+    return failClosed
   }
 }
 

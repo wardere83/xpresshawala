@@ -4,11 +4,16 @@ import { Apple, ArrowDownUp, Check, ChevronRight, Lock, CreditCard, Landmark } f
 import { ScreenHeader, Avatar, PrimaryButton } from '../components/ui'
 import { useI18n, useMirrorClass } from '../i18n'
 import { useTransfer } from '../state/TransferContext'
+import { useAuth } from '../auth/AuthContext'
+import { useAccountData } from '../state/AccountData'
+import { hueFor } from '../lib/view'
 import { paymentMethods, recipients, relationName, user, TRANSFER_FEE } from '../data/mock'
 import { amount as fmtAmount, rate as fmtRate, usd } from '../lib/format'
 import type { TranslationKey } from '../i18n/en'
 
 export function SendMoney() {
+  const { isDemo } = useAuth()
+  const { recipients: mine, loading, error: accountError } = useAccountData()
   const { t, lang } = useI18n()
   const mirror = useMirrorClass()
   const navigate = useNavigate()
@@ -21,21 +26,42 @@ export function SendMoney() {
     setAmountUsd,
     paymentMethod,
     setPaymentMethod,
+    availableError,
+    quoteReady,
+    quoteLoading,
   } = useTransfer()
 
   const [raw, setRaw] = useState(String(amountUsd))
   const [pickerOpen, setPickerOpen] = useState(false)
 
   const parsed = Number(raw.replace(/[^0-9.]/g, '')) || 0
-  const tooLow = parsed <= TRANSFER_FEE
-  const tooHigh = quote.totalUsd > user.balanceUsd
-  const error = tooLow ? t('send.amountTooLow', { fee: usd(TRANSFER_FEE) }) : tooHigh ? t('send.amountTooHigh') : null
+  const tooLow = isDemo ? parsed <= TRANSFER_FEE : parsed <= 0 || !/^\d+(?:\.\d{0,2})?$/.test(raw)
+  const tooHigh = isDemo && quote.totalUsd > user.balanceUsd
+  const error = tooLow ? (isDemo ? t('send.amountTooLow', { fee: usd(TRANSFER_FEE) }) : 'Enter a positive amount with up to two decimal places.')
+    : tooHigh ? t('send.amountTooHigh') : availableError
+  const pickerRecipients = isDemo ? recipients : mine.map((r) => ({
+    id: r.id, name: r.full_name, phone: r.phone ?? '', wallet: r.bank_name ?? r.payout_method.replaceAll('_', ' '),
+    corridorCode: r.country, last4: r.phone?.slice(-4) ?? '', favourite: false,
+    relation: r.relationship ?? r.country, relationI18n: {}, hue: hueFor(r.full_name),
+  }))
 
   const onAmountChange = (value: string) => {
     const cleaned = value.replace(/[^0-9.]/g, '').replace(/(\..*)\./g, '$1')
     setRaw(cleaned)
     setAmountUsd(Number(cleaned) || 0)
   }
+
+  if (!isDemo && mine.length === 0) return (
+    <div className="flex flex-1 flex-col overflow-hidden">
+      <ScreenHeader title={t('send.title')} onBack={() => navigate(-1)} />
+      <div className="px-4 py-6">
+        <p role={accountError ? 'alert' : undefined} className="mb-4 text-[14px] text-ink-700">
+          {loading ? 'Loading your recipients…' : accountError ?? 'Add a recipient before creating a test transfer.'}
+        </p>
+        {!loading && <PrimaryButton onClick={() => navigate('/recipients')}>{t('recipients.add')}</PrimaryButton>}
+      </div>
+    </div>
+  )
 
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
@@ -81,7 +107,7 @@ export function SendMoney() {
             />
           </div>
           <p className="mt-1 text-[12px] text-ink-500">
-            {t('field.availableBalance')} · <bdi>{usd(user.balanceUsd)}</bdi>
+            {isDemo ? <>{t('field.availableBalance')} · <bdi>{usd(user.balanceUsd)}</bdi></> : 'Live wallet funding is unavailable. This is a test account.'}
           </p>
         </div>
 
@@ -101,12 +127,12 @@ export function SendMoney() {
             </span>
             <span className="text-[13px] font-bold text-ink-700">
               <bdi>
-                {corridor.currency} · {corridor.currencyName}
+                {corridor.currency ? <>{corridor.currency} · {corridor.currencyName}</> : 'Choose a recipient for a test quote'}
               </bdi>
             </span>
           </div>
           <p className="mt-2 text-[30px] font-semibold tracking-tight text-ink-900">
-            <bdi>{fmtAmount(quote.recipientLocal)}</bdi>
+            <bdi>{quoteReady ? fmtAmount(quote.recipientLocal) : '—'}</bdi>
           </p>
           <p className="mt-1 text-[12px] text-ink-500">{t('field.estimated')}</p>
         </div>
@@ -114,7 +140,7 @@ export function SendMoney() {
         {/* Corridors pay out in the currency they are funded in, so there is
             no exchange rate to show. Printing "1 USD = 1 USD" would look like
             a bug. The row returns on its own if an FX corridor is ever added. */}
-        {corridor.currency !== 'USD' ? (
+        {quoteReady && corridor.currency !== 'USD' ? (
           <div className="mt-3 flex items-center justify-between rounded-xl bg-brand-50 px-4 py-3">
             <span className="text-[12px] font-semibold text-brand-700">{t('field.exchangeRate')}</span>
             <span className="text-[12px] font-bold text-brand-700">
@@ -134,7 +160,7 @@ export function SendMoney() {
         {/* Payment method */}
         <p className="mt-6 mb-2 text-[13px] font-bold text-ink-700">{t('field.paymentMethod')}</p>
         <div className="card overflow-hidden">
-          {paymentMethods.map((m, i) => {
+          {!isDemo ? <p className="px-4 py-4 text-[13px] text-ink-700">Test funding — no bank or card is charged. Bank and wallet connections are unavailable.</p> : paymentMethods.map((m, i) => {
             const selected = paymentMethod === m.id
             return (
               <button
@@ -176,8 +202,8 @@ export function SendMoney() {
         </div>
 
         <div className="mt-6">
-          <PrimaryButton disabled={!!error} onClick={() => navigate('/review')}>
-            {t('common.continue')}
+          <PrimaryButton disabled={!!error || !quoteReady} onClick={() => navigate('/review')}>
+            {quoteLoading ? 'Getting a test quote…' : t('common.continue')}
           </PrimaryButton>
           <p className="mt-3 flex items-center justify-center gap-1.5 text-[11px] font-semibold text-ink-500">
             <Lock size={12} />
@@ -201,7 +227,7 @@ export function SendMoney() {
               <h2 className="text-[15px] font-bold text-ink-900">{t('send.chooseRecipient')}</h2>
             </div>
             <ul>
-              {recipients.map((r) => (
+              {pickerRecipients.map((r) => (
                 <li key={r.id}>
                   <button
                     type="button"

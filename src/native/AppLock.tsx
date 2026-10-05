@@ -1,18 +1,19 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { App as CapApp } from '@capacitor/app'
-import { BiometricAuth, BiometryType } from '@aparajita/capacitor-biometric-auth'
+import { BiometricAuth } from '@aparajita/capacitor-biometric-auth'
 import { Lock } from 'lucide-react'
 import { useT } from '../i18n'
 import { Logo } from '../components/Logo'
-import { isNative } from './capabilities'
+import { hideSplash, isNative } from './capabilities'
 
 /**
  * Biometric gate for the native apps.
  *
  * A remittance app shows balances, recipient names and transfer history, so a
  * borrowed or stolen phone should not open it just because a session cookie is
- * still valid. The lock sits above the router: nothing renders until the
- * device has confirmed who is holding it.
+ * still valid. Mount this gate on the authenticated product layout, below the
+ * account providers. The lock hides the product without discarding its state;
+ * public sign-in, privacy and support routes remain accessible.
  *
  * It fails open rather than closed. A device with no enrolled biometry, or a
  * platform where the plugin is unavailable, is left unlocked. Locking someone
@@ -28,10 +29,15 @@ export function AppLock({ children }: { children: ReactNode }) {
   const [available, setAvailable] = useState(false)
   const [unlocked, setUnlocked] = useState(!isNative)
   const [checking, setChecking] = useState(isNative)
+  const [authenticating, setAuthenticating] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const backgroundedAt = useRef<number | null>(null)
+  const authenticationPending = useRef(false)
 
   const authenticate = useCallback(async () => {
+    if (authenticationPending.current) return
+    authenticationPending.current = true
+    setAuthenticating(true)
     setError(null)
     try {
       await BiometricAuth.authenticate({
@@ -46,6 +52,9 @@ export function AppLock({ children }: { children: ReactNode }) {
     } catch {
       // Cancelled or failed. Stay locked and let them try again.
       setError(t('lock.failed'))
+    } finally {
+      authenticationPending.current = false
+      setAuthenticating(false)
     }
   }, [t])
 
@@ -60,11 +69,17 @@ export function AppLock({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!isNative) return
+    // A cancelled biometric prompt must leave a visible lock and retry button,
+    // even when the platform holds its launch splash until explicitly hidden.
+    void hideSplash()
     let cancelled = false
     void (async () => {
       try {
         const info = await BiometricAuth.checkBiometry()
-        const usable = info.isAvailable || info.biometryType !== BiometryType.none
+        // Hardware support alone does not mean the user has enrolled biometry.
+        // A configured device passcode is also usable because authentication
+        // explicitly permits device credentials as its fallback.
+        const usable = info.isAvailable || info.deviceIsSecure
         if (cancelled) return
         setAvailable(usable)
         setChecking(false)
@@ -86,6 +101,7 @@ export function AppLock({ children }: { children: ReactNode }) {
   // Re-lock after the app has been away long enough to change hands.
   useEffect(() => {
     if (!isNative || !available) return
+    let disposed = false
     let remove: (() => void) | undefined
     void CapApp.addListener('appStateChange', ({ isActive }) => {
       if (!isActive) {
@@ -96,33 +112,45 @@ export function AppLock({ children }: { children: ReactNode }) {
       backgroundedAt.current = null
       if (since && Date.now() - since > RELOCK_AFTER_MS) setUnlocked(false)
     }).then((handle) => {
-      remove = () => void handle.remove()
+      if (disposed) void handle.remove()
+      else remove = () => void handle.remove()
     })
-    return () => remove?.()
+    return () => { disposed = true; remove?.() }
   }, [available])
 
-  if (unlocked && !checking) return <>{children}</>
+  if (!isNative) return <>{children}</>
+
+  const locked = !unlocked || checking
 
   return (
-    <div className="grid min-h-dvh place-items-center bg-canvas px-6 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
+    <>
+    <div hidden={locked} inert={locked} aria-hidden={locked || undefined}>
+      {children}
+    </div>
+    {locked ? (
+    <div role="dialog" aria-modal="true" aria-labelledby="app-lock-title"
+      className="fixed inset-0 z-[100] grid min-h-dvh place-items-center overflow-y-auto bg-canvas px-6 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
       <div className="flex max-w-xs flex-col items-center text-center">
         <Logo height={36} />
         <span className="mt-8 grid h-14 w-14 place-items-center rounded-xl bg-brand-100 text-brand-700">
           <Lock size={22} />
         </span>
-        <h1 className="mt-5 text-[17px] font-semibold tracking-tight">{t('lock.title')}</h1>
+        <h1 id="app-lock-title" className="mt-5 text-[17px] font-semibold tracking-tight">{t('lock.title')}</h1>
         <p className="mt-2 text-[13px] leading-relaxed text-ink-500">{t('lock.reason')}</p>
         {error ? <p role="alert" className="mt-3 text-[13px] font-medium text-alert">{error}</p> : null}
         {!checking ? (
           <button
             type="button"
+            disabled={authenticating}
             onClick={() => void authenticate()}
-            className="mt-6 rounded-full bg-brand-600 px-6 py-3 text-[14px] font-semibold text-white transition hover:bg-brand-700"
+            className="mt-6 rounded-full bg-brand-600 px-6 py-3 text-[14px] font-semibold text-white transition hover:bg-brand-700 disabled:opacity-60"
           >
             {t('lock.unlock')}
           </button>
         ) : null}
       </div>
     </div>
+    ) : null}
+    </>
   )
 }

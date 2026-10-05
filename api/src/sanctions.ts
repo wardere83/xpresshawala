@@ -354,13 +354,13 @@ export async function screenName(env: Env, name: string, snapshot?: SanctionsDat
 /** Build an insert for the caller's atomic transaction; this does not execute. */
 export function sanctionsScreeningStatement(
   env: Env,
-  args: { id?: string; subjectType: 'user' | 'recipient'; subjectId: string; name: string; transferId?: string; stage?: string },
+  args: { id?: string; subjectType: 'user' | 'recipient'; subjectId: string; name: string; transferId?: string; stage?: string; guard?: { sql: string; values: (string | number)[] } },
   result: ScreeningResult,
 ): D1PreparedStatement {
   return env.DB.prepare(
     `INSERT INTO sanctions_screenings
        (id, subject_type, subject_id, transfer_id, provider, status, match_json, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+     SELECT ?, ?, ?, ?, ?, ?, ?, ?${args.guard ? ` WHERE ${args.guard.sql}` : ''}`,
   ).bind(
     args.id ?? newId('scr'),
     args.subjectType,
@@ -370,5 +370,6 @@ export function sanctionsScreeningStatement(
     result.status,
     JSON.stringify({ subjectName: args.name, stage: args.stage ?? null, ...result }),
     new Date().toISOString(),
+    ...(args.guard?.values ?? []),
   )
 }

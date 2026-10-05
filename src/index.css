@@ -134,6 +134,14 @@
   }
 }
 
+/* Keep native form text large enough to avoid iOS focus zoom while allowing
+   the user to pinch zoom. Decimal amount fields already use a larger display
+   size, so retain their existing typography. This rule is outside the layers
+   to override the smaller text utilities used by the shared web forms. */
+html.native :is(input, textarea, select):not([inputmode='decimal']) {
+  font-size: 16px;
+}
+
 @layer components {
   /* A hairline plus a shallow shadow, rather than a shadow alone. The border is
      what actually defines the card at rest; the shadow only lifts it off the

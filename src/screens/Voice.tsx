@@ -5,6 +5,8 @@ import { LanguageSwitcher } from '../components/LanguageSwitcher'
 import { Waveform } from '../components/ui'
 import { useT } from '../i18n'
 import type { TranslationKey } from '../i18n/en'
+import { useAuth } from '../auth/AuthContext'
+import { Unavailable } from './Unavailable'
 
 const LISTEN_SECONDS = 20
 
@@ -16,6 +18,11 @@ const samples: { key: TranslationKey; intent: string }[] = [
 ]
 
 export function Voice() {
+  const { isDemo } = useAuth()
+  return isDemo ? <DemoVoice /> : <Unavailable title="Voice commands" message="Voice recognition is not available for customer accounts. Use the transfer form to create a test record; no audio is recorded." to="/send" action="Open test transfer form" />
+}
+
+function DemoVoice() {
   const t = useT()
   const navigate = useNavigate()
   const [listening, setListening] = useState(true)
@@ -131,7 +138,7 @@ export function Voice() {
 
         <p className="mt-6 flex items-center justify-center gap-1.5 text-[12px] font-semibold text-ink-500">
           <Sparkles size={14} className="text-brand-600" />
-          {t('voice.poweredBy')}
+          Scripted demo — no audio is recorded
         </p>
       </div>
     </div>

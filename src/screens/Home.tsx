@@ -128,7 +128,7 @@ export function Home() {
         )}
         <div className="product-home-greeting">
           <h1>
-            {t('home.greeting', { name: account?.firstName ?? user.firstName })}
+            {t('home.greeting', { name: account?.firstName ?? (isDemo ? user.firstName : 'there') })}
           </h1>
           <p>{t('home.subtitle')}</p>
         </div>
@@ -142,7 +142,7 @@ export function Home() {
               <ArrowUpRight size={21} />
             </span>
           </button>
-          <div className="product-services">
+          {isDemo ? <div className="product-services">
             {services.map(({ key, icon: Icon, method }) => (
               <button
                 key={key}
@@ -156,7 +156,7 @@ export function Home() {
                 <span>{t(key)}</span>
               </button>
             ))}
-          </div>
+          </div> : <p className="px-4 pb-4 text-[12px] text-ink-500">Test transfers only. Bank, wallet, cash pickup and airtime delivery are unavailable.</p>}
         </section>
 
         {/* Recent transaction */}
@@ -198,11 +198,7 @@ export function Home() {
                     }`}
                     aria-hidden="true"
                   />
-                  {t(
-                    latest.status === 'completed'
-                      ? 'common.completed'
-                      : 'common.pending',
-                  )}
+                  {isDemo ? t(latest.status === 'completed' ? 'common.completed' : 'common.pending') : latest.status.replaceAll('_', ' ')}
                 </span>
               </span>
             </button>
@@ -262,7 +258,7 @@ export function Home() {
           className="product-home-tools"
           aria-label={t('home.quickActions')}
         >
-          {quickActions.map(({ titleKey, icon: Icon, to }) => (
+          {quickActions.filter(({ to }) => isDemo || ['/help', '/support'].includes(to)).map(({ titleKey, icon: Icon, to }) => (
             <button key={titleKey} type="button" onClick={() => navigate(to)}>
               <Icon size={17} strokeWidth={1.6} />
               <span>{t(titleKey)}</span>
@@ -270,11 +266,11 @@ export function Home() {
           ))}
         </section>
 
-        <p className="mt-6 text-center text-[11px] leading-relaxed text-ink-500">
+        {isDemo && <p className="mt-6 text-center text-[11px] leading-relaxed text-ink-500">
           <bdi>
             1 USD = {rate(corridor.rate)} {corridor.currency}
           </bdi>
-        </p>
+        </p>}
       </div>
     </div>
   )
