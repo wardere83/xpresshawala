@@ -133,6 +133,16 @@ jobs:
         run: scripts/ci/verify-android-release.sh
         env:
           EXPECTED_ANDROID_VERSION_CODE: ${{ github.run_number }}
+      - name: Retain failed Android verification outputs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-release-verification-diagnostics
+          path: |
+            android/app/build/outputs/apk/release/*.apk
+            android/app/build/outputs/bundle/release/*.aab
+          retention-days: 7
+          if-no-files-found: ignore
       - name: Upload verified Android artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -231,13 +241,17 @@ jobs:
           xcrun simctl launch "$DEVICE" com.xpresstend.app
           # Let the native splash and first API session check finish.
           sleep 12
+          xcrun simctl io "$DEVICE" screenshot "$RUNNER_TEMP/ios-launch-early.png"
+          # A freshly booted hosted simulator can still be starting WebKit.
+          # Keep a later frame too so a held splash cannot masquerade as UI.
+          sleep 45
           xcrun simctl io "$DEVICE" screenshot "$RUNNER_TEMP/ios-launch.png"
           xcrun simctl shutdown "$DEVICE"
       - name: Keep the native launch screenshot
         uses: actions/upload-artifact@v4
         with:
           name: xpresstend-ios-launch
-          path: ${{ runner.temp }}/ios-launch.png
+          path: ${{ runner.temp }}/ios-launch*.png
           if-no-files-found: error
 
   ios-signed:
