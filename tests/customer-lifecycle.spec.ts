@@ -15,6 +15,7 @@ test('password recovery gives a generic confirmation and allows retry after an u
   })
   await page.goto('/#/login')
   await page.getByRole('link', { name: 'Forgot your password?', exact: true }).click()
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Reset your password')
   await page.getByLabel('Email', { exact: true }).fill('person@example.invalid')
   await page.getByRole('button', { name: 'Send reset instructions', exact: true }).click()
   await expect(page.getByRole('alert')).toHaveText('Please try again shortly.')

@@ -105,6 +105,7 @@ test('native bridge sessions reach the real API and cancelled or background lock
     await expect(page.getByRole('alert')).toContainText('sign in or reset your password')
     await expect(page.getByRole('dialog', { name: 'App locked' })).toHaveCount(0)
     await page.getByRole('link', { name: 'Sign in', exact: true }).click()
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText('Welcome back')
     await page.getByLabel('Email', { exact: true }).fill('customer@example.invalid')
     await page.getByLabel('Password', { exact: true }).fill(password)
     await page.getByRole('button', { name: 'Sign in', exact: true }).click()
