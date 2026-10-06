@@ -85,6 +85,8 @@ function useBannerFilm() {
 
 function Banner() {
   const hasFilm = useBannerFilm()
+  const [failed, setFailed] = useState(false)
+  const showFilm = hasFilm && !failed
   const video = useRef<HTMLVideoElement>(null)
   const [playing, setPlaying] = useState(false)
   const [reduceMotion, setReduceMotion] = useState(
@@ -103,7 +105,7 @@ function Banner() {
 
   return (
     <section className="relative isolate overflow-hidden bg-xt-navy text-white" aria-labelledby="philanthropy-title">
-      {hasFilm ? (
+      {showFilm ? (
         <video
           ref={video}
           className="absolute inset-0 -z-20 h-full w-full object-cover"
@@ -116,8 +118,9 @@ function Banner() {
           aria-label="Community members of different ages and backgrounds learning about money together in a classroom and around their neighbourhood."
           onPlay={() => setPlaying(true)}
           onPause={() => setPlaying(false)}
+          onError={() => setFailed(true)}
         >
-          <source src={FILM_SRC} type="video/mp4" />
+          <source src={FILM_SRC} type="video/mp4" onError={() => setFailed(true)} />
         </video>
       ) : (
         <div
@@ -145,7 +148,7 @@ function Banner() {
         </ul>
       </div>
 
-      {hasFilm ? (
+      {showFilm ? (
         <button
           type="button"
           className="absolute bottom-5 right-5 grid h-11 w-11 place-items-center rounded-full border border-white/40 bg-xt-navy/60 text-white backdrop-blur-sm hover:bg-xt-navy focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-xt-turquoise"
