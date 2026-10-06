@@ -6,7 +6,6 @@ import { Contents, Facts, H, Shell } from './PageShell'
 import { CORRIDORS as PRICED } from './pricing'
 
 const MARKETS = PRICED.map((corridor) => corridor.label).join(', ')
-const partnershipEmail = `mailto:${brand.support.email}?subject=Partnership%20enquiry`
 
 interface SanctionsReadiness {
   ready: boolean
@@ -109,7 +108,7 @@ export function Company() {
         Service availability is subject to licensing, banking and payout arrangements.
       </p>
 
-      <H id="approach">Clarity, accountability and collaboration</H>
+      <H id="approach">Clarity, accountability and community</H>
       <p>
         Clear customer information, controlled access and traceable transaction records guide
         our approach. Our <Link className="underline" to="/compliance">compliance overview</Link>{' '}
@@ -117,10 +116,10 @@ export function Company() {
         platform controls and service requirements relevant to institutional review.
       </p>
       <p>
-        We work toward responsible cross-border service through collaboration with banking,
-        fintech and payment infrastructure partners. Visit{' '}
-        <Link className="underline" to="/partners">partnerships</Link> to explore areas of
-        collaboration and start a discussion.
+        We also invest in the communities we serve. Through{' '}
+        <Link className="underline" to="/philanthropy">XpressTend Financial Literacy</Link> we
+        build real money skills and lasting upward mobility using culturally congruent
+        strengths-based strategies.
       </p>
 
       <H id="contact">Contact the company</H>
@@ -133,8 +132,8 @@ export function Company() {
         </a>.
       </p>
       <p>
-        Financial institutions, fintech providers and other prospective partners can{' '}
-        <a className="underline" href={partnershipEmail}>contact us about a partnership</a>.
+        Financial institutions, fintech providers and community organisations can reach the
+        right team through our <Link className="underline" to="/support">contact page</Link>.
       </p>
     </Shell>
   )
@@ -144,7 +143,7 @@ export function Compliance() {
   return (
     <Shell
       title="Compliance"
-      intro="Company registration, service availability and platform controls for financial institutions, payment partners and regulatory reviewers."
+      intro="Company registration, service availability and platform controls for financial institutions, payment providers and regulatory reviewers."
     >
       <Contents
         items={[
@@ -227,7 +226,7 @@ export function Compliance() {
 
       <H id="contact">Compliance enquiries</H>
       <p>
-        Regulators and partner compliance teams can email{' '}
+        Regulators and institutional compliance teams can email{' '}
         <a className="underline" href={`mailto:${brand.support.email}?subject=Compliance%20enquiry`}>
           {brand.support.email}
         </a>{' '}
@@ -286,10 +285,10 @@ export function Security() {
 
       <H id="review">Technical review</H>
       <p>
-        Prospective partners can request a review of the platform architecture, authentication,
+        Institutional reviewers can request a review of the platform architecture, authentication,
         ledger model, audit trail and integration requirements. Detailed technical discussions
         and supporting documentation can be coordinated through our{' '}
-        <Link className="underline" to="/partners">partnerships contact</Link>.
+        <Link className="underline" to="/support">contact page</Link>.
       </p>
 
       <H id="disclosure">Report a security issue</H>
@@ -302,86 +301,6 @@ export function Security() {
         acknowledge the report and keep you informed during investigation. Please allow a
         reasonable opportunity for remediation before public disclosure.
       </p>
-    </Shell>
-  )
-}
-
-export function Partners() {
-  return (
-    <Shell
-      title="Partner with XpressTend"
-      intro="We welcome discussions with financial institutions, fintech companies and payment infrastructure providers that share our focus on clear, accessible cross-border payments."
-    >
-      <Contents
-        items={[
-          { id: 'focus', label: 'Our partnership focus' },
-          { id: 'areas', label: 'Areas of collaboration' },
-          { id: 'diligence', label: 'Institutional review' },
-          { id: 'contact', label: 'Start a conversation' },
-        ]}
-      />
-
-      <H id="focus">Our partnership focus</H>
-      <p>
-        XpressTend brings a multilingual digital remittance experience together with transaction
-        workflows, role-based operations and traceable ledger records. Our focus is
-        US-originated transfers and the communities connected to {MARKETS}.
-      </p>
-      <p>
-        Partnership discussions cover the regulated payment services, payout reach and
-        compliance integrations required for each corridor. Scope, responsibilities and service
-        availability are established through onboarding and institutional review.
-      </p>
-
-      <H id="areas">Areas of collaboration</H>
-      <ul className="list-disc space-y-3 pl-5">
-        <li>
-          <strong className="text-ink-900">Banking and regulated payment services.</strong>{' '}
-          Sponsor banking and licensed payment partnerships for US-originated remittances.
-        </li>
-        <li>
-          <strong className="text-ink-900">Payout infrastructure.</strong>{' '}
-          Mobile wallet, bank deposit and cash pickup capabilities in our focus markets.
-        </li>
-        <li>
-          <strong className="text-ink-900">Identity and financial crime controls.</strong>{' '}
-          Customer verification and production sanctions screening integrations.
-        </li>
-        <li>
-          <strong className="text-ink-900">Account funding and payment acceptance.</strong>{' '}
-          Card acquiring and funding services for the sending side.
-        </li>
-      </ul>
-
-      <H id="diligence">Institutional review</H>
-      <p>
-        Our <Link className="underline" to="/company">company information</Link>,{' '}
-        <Link className="underline" to="/compliance">compliance overview</Link> and{' '}
-        <Link className="underline" to="/security">security overview</Link> provide an initial
-        reference for due diligence. We welcome technical and compliance discussions covering
-        the customer journey, transaction controls, ledger and audit records, integration scope
-        and operating requirements.
-      </p>
-      <p>
-        Further documentation and platform walkthroughs can be coordinated on request,
-        including confidential discussions under NDA where appropriate.
-      </p>
-
-      <H id="contact">Start a conversation</H>
-      <div className="rounded-2xl border border-ink-200 bg-canvas p-5 sm:p-6">
-        <p className="font-semibold text-ink-900">Partnership and institutional enquiries</p>
-        <p className="mt-2">
-          Email <a className="underline" href={partnershipEmail}>{brand.support.email}</a> with
-          your organisation, the area of collaboration and any initial diligence requirements.
-        </p>
-        <p className="mt-4 text-sm">
-          {brand.legalName}<br />
-          {brand.hq.city}, {brand.hq.state}, {brand.hq.country}<br />
-          <a className="underline" href={`tel:${brand.support.phone.replace(/[^+\d]/g, '')}`}>
-            {brand.support.phone}
-          </a>
-        </p>
-      </div>
     </Shell>
   )
 }

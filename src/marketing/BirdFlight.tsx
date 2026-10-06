@@ -10,7 +10,8 @@ function lastLetter(heading: HTMLElement): { range: Range; letter: string } | nu
   const nodes: Text[] = []
   while (walker.nextNode()) nodes.push(walker.currentNode as Text)
   for (const node of nodes.reverse()) {
-    const matches = [...node.data.matchAll(/\p{L}/gu)]
+    // A letter together with its combining marks, so Arabic tanween stays whole.
+    const matches = [...node.data.matchAll(/\p{L}\p{M}*/gu)]
     const match = matches.at(-1)
     if (!match) continue
     const range = document.createRange()
@@ -118,7 +119,7 @@ export function BirdFlight({ title }: { title: string }) {
     const fly = (geometry: Flight, duration: number, initialTilt = 0, initialOpacity = 0.1) => {
       cancel()
       const current = element.animate(flightFrames(geometry, initialTilt, initialOpacity), {
-        duration, easing: 'cubic-bezier(.25,.1,.3,1)', fill: 'forwards',
+        duration, easing: 'cubic-bezier(.3,.05,.55,1)', fill: 'forwards',
       })
       animation.current = current
       current.onfinish = () => { if (animation.current === current) perch() }
@@ -148,7 +149,8 @@ export function BirdFlight({ title }: { title: string }) {
       if (!flown.current && !animation.current && running && geometry) {
         setPhase('flying')
         const distance = Math.hypot(geometry.end.x - geometry.start.x, geometry.end.y - geometry.start.y)
-        fly(geometry, Math.min(6000, Math.max(3800, 2400 + distance * 6)))
+        // An unhurried glide: slow enough to follow all the way to its perch.
+        fly(geometry, Math.min(14000, Math.max(9000, 5600 + distance * 14)))
       } else if (animation.current) {
         if (running) animation.current.play()
         else animation.current.pause()

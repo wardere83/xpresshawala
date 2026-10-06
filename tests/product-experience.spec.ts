@@ -14,7 +14,7 @@ test.beforeEach(async ({ page }) => {
 
 const corporateHeadline = /Connecting people\.\s*Enabling possibility\./
 
-test('the public homepage leads to company information and a working partnership enquiry', async ({
+test('the public homepage leads to company information and a working philanthropy enquiry', async ({
   page,
 }) => {
   const errors: string[] = []
@@ -28,7 +28,7 @@ test('the public homepage leads to company information and a working partnership
   })
   await page.goto('/')
   await expect(page.getByRole('heading', { level: 1 })).toHaveText(corporateHeadline)
-  for (const name of ['Company', 'Compliance', 'Security', 'Partnerships']) {
+  for (const name of ['Company', 'Compliance', 'Security', 'Philanthropy']) {
     await expect(page.locator('header').getByRole('link', { name, exact: true })).toBeVisible()
   }
 
@@ -46,13 +46,54 @@ test('the public homepage leads to company information and a working partnership
   await expect(page).toHaveURL(/#\/company$/)
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('About XpressTend')
   await page.goto('/')
-  await page.locator('header').getByRole('link', { name: 'Partnerships', exact: true }).click()
-  await expect(page).toHaveURL(/#\/partners$/)
-  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Partner with XpressTend')
+  await page.locator('header').getByRole('link', { name: 'Philanthropy', exact: true }).click()
+  await expect(page).toHaveURL(/#\/philanthropy$/)
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('XpressTend Financial Literacy')
   await expect(
     page.locator('main a[href^="mailto:"][href*="subject="]').first(),
-  ).toHaveAttribute('href', /^mailto:support@xpresstend\.com\?subject=Partnership%20enquiry$/)
+  ).toHaveAttribute('href', /^mailto:support@xpresstend\.com\?subject=Financial%20Literacy%20enquiry$/)
   expect(errors).toEqual([])
+})
+
+test('the former partnerships address opens XpressTend Financial Literacy', async ({ page }) => {
+  await page.goto('/#/partners')
+  await expect(page).toHaveURL(/#\/philanthropy$/)
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('XpressTend Financial Literacy')
+  await expect(page.locator('main')).toContainText('culturally congruent strengths-based strategies')
+  await expect(page.getByText(/philanthropic efforts that are deficit-based/)).toBeVisible()
+  await expect(page.getByText(/investing in the great minds of today and tomorrow/)).toBeVisible()
+  await expect(page.locator('body')).not.toContainText(/partnership/i)
+})
+
+test('the homepage philanthropy section carries the agreed words and leads to the page', async ({ page }) => {
+  await page.goto('/')
+  const section = page.locator('.corporate-partners')
+  await expect(section.locator('.brand-eyebrow')).toHaveText('Philanthropy')
+  await expect(section.getByRole('heading', { level: 2 })).toHaveText('Let’s also make financial literacy cool.')
+  await expect(section.locator('.brand-body')).toHaveText(
+    'We build real money skills and lasting upward mobility in underserved communities across Washington state, Nairobi, São Paulo, and beyond.',
+  )
+  await expect(page.locator('body')).not.toContainText(/partnership/i)
+  await section.getByRole('link', { name: 'Explore XpressTend Financial Literacy' }).click()
+  await expect(page).toHaveURL(/#\/philanthropy$/)
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('XpressTend Financial Literacy')
+})
+
+test('the philanthropy banner stays a still until a real film is published', async ({ page }) => {
+  // Production answers a missing file with the site shell: 200, text/html.
+  await page.route('**/media/community-literacy.mp4', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'text/html; charset=utf-8',
+      body: '',
+    }),
+  )
+  const probe = page.waitForResponse((response) => response.url().includes('/media/community-literacy.mp4'))
+  await page.goto('/#/philanthropy')
+  await probe
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('XpressTend Financial Literacy')
+  await expect(page.locator('main video')).toHaveCount(0)
+  await expect(page.getByRole('button', { name: /the film/ })).toHaveCount(0)
 })
 
 test('keyboard users can skip the homepage navigation', async ({ page }) => {
@@ -165,10 +206,10 @@ for (const width of [320, 390, 768, 1440]) {
     await page.setViewportSize({ width, height: 900 })
     await page.goto('/')
     await expect(page.getByRole('heading', { level: 1 })).toHaveText(corporateHeadline)
-    await expect(page.locator('header').getByRole('link', { name: 'Partnerships', exact: true })).toBeVisible()
+    await expect(page.locator('header').getByRole('link', { name: 'Philanthropy', exact: true })).toBeVisible()
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width)
 
-    for (const [name, path] of [['Company', 'company'], ['Partnerships', 'partners']]) {
+    for (const [name, path] of [['Company', 'company'], ['Philanthropy', 'philanthropy']]) {
       await page.locator('header').getByRole('link', { name, exact: true }).click()
       await expect(page).toHaveURL(new RegExp(`#/${path}$`))
       await expect(page.locator('header').getByRole('link', { name, exact: true })).toHaveAttribute('aria-current', 'page')
@@ -200,10 +241,10 @@ for (const [language, explore] of [
     await expect(page.getByRole('heading', { level: 1 })).not.toHaveText(corporateHeadline)
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390)
 
-    await page.locator('header a[href="#/partners"]').click()
-    await expect(page).toHaveURL(/#\/partners$/)
-    await expect(page.getByRole('heading', { level: 1 })).toHaveText('Partner with XpressTend')
-    // Institutional and legal pages are published in English, including when
+    await page.locator('header a[href="#/philanthropy"]').click()
+    await expect(page).toHaveURL(/#\/philanthropy$/)
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText('XpressTend Financial Literacy')
+    // Company, philanthropy and legal pages are published in English, including when
     // reached from an Arabic homepage.
     await expect(page.locator('main').locator('..')).toHaveAttribute('lang', 'en')
     await expect(page.locator('main')).toHaveCSS('direction', 'ltr')
@@ -251,7 +292,7 @@ test('company pages show a plain NMLS ID and accurate service availability', asy
   for (const [path, heading] of [
     ['company', 'About XpressTend'],
     ['security', 'Security and platform'],
-    ['partners', 'Partner with XpressTend'],
+    ['philanthropy', 'XpressTend Financial Literacy'],
   ]) {
     await page.goto(`/#/${path}`)
     await expect(page.getByRole('heading', { level: 1 })).toHaveText(heading)
@@ -267,7 +308,7 @@ test('footer company, support and privacy links reach their intended pages', asy
     ['Company', 'About XpressTend'],
     ['Compliance', 'Compliance'],
     ['Security', 'Security and platform'],
-    ['Partnerships', 'Partner with XpressTend'],
+    ['Philanthropy', 'XpressTend Financial Literacy'],
     ['Contact', 'Contact and support'],
     ['Privacy', 'Privacy Policy'],
   ]) {
