@@ -90,30 +90,30 @@ export function PageHeader() {
 export function PageFooter() {
   return (
     <footer className="border-t border-ink-200/70 bg-canvas">
-      <div className="mx-auto max-w-5xl px-5 py-9 text-sm leading-relaxed text-ink-600 sm:px-8">
+      <div className="mx-auto max-w-5xl px-5 py-9 text-sm leading-relaxed text-ink-700 sm:px-8">
         <div className="grid gap-7 sm:grid-cols-2">
           <div>
             <p className="font-semibold text-ink-900">{brand.legalName}</p>
             <p className="mt-2">{brand.hq.city}, {brand.hq.state}, {brand.hq.country}</p>
             <p className="mt-3">
-              <a className="underline underline-offset-4" href={`mailto:${brand.support.email}`}>
+              <a className="underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand-600" href={`mailto:${brand.support.email}`}>
                 {brand.support.email}
               </a>
               <br />
-              <a className="underline underline-offset-4" href={`tel:${brand.support.phone.replace(/[^+\d]/g, '')}`}>
+              <a className="underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand-600" href={`tel:${brand.support.phone.replace(/[^+\d]/g, '')}`}>
                 {brand.support.phone}
               </a>
             </p>
           </div>
           <nav aria-label="Company resources" className="grid grid-cols-2 content-start gap-x-4 gap-y-3">
             {COMPANY_NAV.map((item) => (
-              <Link key={item.to} className="hover:text-brand-700 hover:underline" to={item.to}>{item.label}</Link>
+              <Link key={item.to} className="hover:text-brand-700 hover:underline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand-600" to={item.to}>{item.label}</Link>
             ))}
-            <Link className="hover:text-brand-700 hover:underline" to="/privacy">Privacy policy</Link>
-            <Link className="hover:text-brand-700 hover:underline" to="/support">Contact and support</Link>
+            <Link className="hover:text-brand-700 hover:underline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand-600" to="/privacy">Privacy policy</Link>
+            <Link className="hover:text-brand-700 hover:underline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand-600" to="/support">Contact and support</Link>
           </nav>
         </div>
-        <div className="mt-7 border-t border-ink-200 pt-6 text-xs leading-6 text-ink-500">
+        <div className="mt-7 border-t border-ink-200 pt-6 text-xs leading-6 text-ink-700">
           <p>{brand.legal.licence}</p>
           <p className="mt-3">{brand.legal.operatingStatus}</p>
           <p className="mt-4">© {new Date().getFullYear()} {brand.legalName}. All rights reserved.</p>
