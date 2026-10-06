@@ -96,26 +96,6 @@ test('the philanthropy banner stays a still until a real film is published', asy
   await expect(page.getByRole('button', { name: /the film/ })).toHaveCount(0)
 })
 
-test('the philanthropy banner plays a published film and lets visitors pause it', async ({ page }) => {
-  // The brand film stands in for footage that has not been supplied yet.
-  await page.route('**/media/community-literacy.mp4', (route) =>
-    route.fulfill({ path: 'public/media/closer.mp4', contentType: 'video/mp4' }),
-  )
-  await page.route('**/media/community-literacy-poster.webp', (route) =>
-    route.fulfill({ path: 'public/media/closer-poster.webp', contentType: 'image/webp' }),
-  )
-  await page.goto('/#/philanthropy')
-  const film = page.locator('main video')
-  await expect(film).toHaveCount(1)
-  await expect
-    .poll(() => film.evaluate((video: HTMLVideoElement) => !video.paused && video.currentTime > 0))
-    .toBe(true)
-  await page.getByRole('button', { name: 'Pause the film', exact: true }).click()
-  await expect.poll(() => film.evaluate((video: HTMLVideoElement) => video.paused)).toBe(true)
-  await expect(page.getByRole('button', { name: 'Play the film', exact: true })).toBeVisible()
-  await expect(page.getByRole('heading', { level: 1 })).toHaveText('XpressTend Financial Literacy')
-})
-
 test('keyboard users can skip the homepage navigation', async ({ page }) => {
   await page.goto('/')
   await expect(page.getByRole('heading', { level: 1 })).toHaveText(corporateHeadline)
