@@ -96,7 +96,7 @@ export function Privacy() {
 }
 
 const CONTACT_ROUTES = [
-  { label: 'Institutional enquiries', subject: 'Institutional enquiry', description: 'Banking, fintech and payment infrastructure collaboration.' },
+  { label: 'Institutional enquiries', subject: 'Institutional enquiry', description: 'Banking, fintech and payment infrastructure enquiries.' },
   { label: 'Financial Literacy enquiries', subject: 'Financial Literacy enquiry', description: 'XpressTend Financial Literacy, our philanthropy and community programs.' },
   { label: 'Compliance enquiries', subject: 'Compliance enquiry', description: 'Institutional review, registration and compliance information.' },
   { label: 'Customer support', subject: 'Customer support', description: 'Account access, product questions and general assistance.' },
@@ -182,7 +182,7 @@ export function Support() {
       </Q>
       <Q q="Which languages does the product support?">
         The product interface supports English, Somali, Spanish, Portuguese and Arabic.
-        Company and legal information is published in English.
+        Company, philanthropy and legal information is published in English.
       </Q>
       <Q q="How do I ask about my personal data?">
         Our <Link className="underline" to="/privacy">privacy policy</Link> explains what we

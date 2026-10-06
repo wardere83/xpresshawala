@@ -194,6 +194,10 @@ export default {
       '/register': '/#/register',
       '/forgot-password': '/#/forgot-password',
       '/delete-account': '/#/delete-account',
+      // Addresses people type or print, and the retired partnerships page.
+      '/philanthropy': '/#/philanthropy',
+      '/financial-literacy': '/#/philanthropy',
+      '/partners': '/#/philanthropy',
     }
     const target = CLEAN_ROUTES[pathname.replace(/\/$/, '')]
     if (target) {

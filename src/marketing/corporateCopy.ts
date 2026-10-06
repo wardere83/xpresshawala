@@ -76,7 +76,7 @@ const so: CorporateCopy = {
   partnerEyebrow: 'Samafal',
   partnerTitle: 'Aan sidoo kale aqoonta maaliyadda ka dhigno wax xiiso leh.',
   partnerBody:
-    'Waxaan bulshooyinka aan helin adeeg ku filan ee ku nool gobolka Washington, Nairobi, São Paulo iyo meelo kale ka dhisnaa xirfado dhab ah oo lacag-maamul iyo horumar nololeed oo waara.',
+    'Waxaan bulshooyinka aan helin adeeg ku filan ee ku nool gobolka Washington, Nairobi, São Paulo iyo meelo kale ka dhisnaa xirfado lacag-maamul oo dhab ah iyo horumar nololeed oo waara.',
   partnerLink: 'Baro XpressTend Financial Literacy',
   trustEyebrow: 'Macluumaadka shirkadda',
   trustTitle: 'Kalsoonidu waxay ka bilaabataa caddayn.',
@@ -202,10 +202,10 @@ const ar: CorporateCopy = {
   accountabilityTitle: 'عمليات تخضع للمساءلة',
   accountabilityBody:
     'توجّه عمليات التحقق من الهوية ومراجعة المعاملات والضوابط الموثّقة نهجنا التشغيلي.',
-  partnerEyebrow: 'العمل الخيري',
+  partnerEyebrow: 'العطاء المجتمعي',
   partnerTitle: 'لنجعل الثقافة المالية ممتعة أيضاً.',
   partnerBody:
-    'نبني مهارات مالية حقيقية وارتقاءً اجتماعياً واقتصادياً دائماً في المجتمعات المحرومة من الخدمات في ولاية واشنطن ونيروبي وساو باولو وخارجها.',
+    'نبني مهارات مالية حقيقية وارتقاءً اجتماعياً واقتصادياً دائماً في المجتمعات الأقل حصولاً على الخدمات في ولاية واشنطن ونيروبي وساو باولو وما وراءها.',
   partnerLink: 'استكشف XpressTend Financial Literacy',
   trustEyebrow: 'معلومات الشركة',
   trustTitle: 'الثقة تبدأ بالوضوح.',

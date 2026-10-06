@@ -10,7 +10,8 @@ function lastLetter(heading: HTMLElement): { range: Range; letter: string } | nu
   const nodes: Text[] = []
   while (walker.nextNode()) nodes.push(walker.currentNode as Text)
   for (const node of nodes.reverse()) {
-    const matches = [...node.data.matchAll(/\p{L}/gu)]
+    // A letter together with its combining marks, so Arabic tanween stays whole.
+    const matches = [...node.data.matchAll(/\p{L}\p{M}*/gu)]
     const match = matches.at(-1)
     if (!match) continue
     const range = document.createRange()
@@ -118,7 +119,7 @@ export function BirdFlight({ title }: { title: string }) {
     const fly = (geometry: Flight, duration: number, initialTilt = 0, initialOpacity = 0.1) => {
       cancel()
       const current = element.animate(flightFrames(geometry, initialTilt, initialOpacity), {
-        duration, easing: 'cubic-bezier(.25,.1,.3,1)', fill: 'forwards',
+        duration, easing: 'cubic-bezier(.3,.05,.55,1)', fill: 'forwards',
       })
       animation.current = current
       current.onfinish = () => { if (animation.current === current) perch() }

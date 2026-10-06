@@ -289,7 +289,7 @@ const ar: Copy = {
   trustCompany: 'الشركة',
   trustCompliance: 'الامتثال',
   trustSecurity: 'الأمان',
-  trustPartners: 'العمل الخيري',
+  trustPartners: 'العطاء المجتمعي',
   footerCompany: 'الشركة',
   footerProduct: 'المنتج',
   footerLegal: 'الشؤون القانونية',

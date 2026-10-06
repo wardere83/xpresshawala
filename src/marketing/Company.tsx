@@ -108,7 +108,7 @@ export function Company() {
         Service availability is subject to licensing, banking and payout arrangements.
       </p>
 
-      <H id="approach">Clarity, accountability and collaboration</H>
+      <H id="approach">Clarity, accountability and community</H>
       <p>
         Clear customer information, controlled access and traceable transaction records guide
         our approach. Our <Link className="underline" to="/compliance">compliance overview</Link>{' '}
@@ -118,7 +118,7 @@ export function Company() {
       <p>
         We also invest in the communities we serve. Through{' '}
         <Link className="underline" to="/philanthropy">XpressTend Financial Literacy</Link> we
-        build real money skills and lasting upward mobility using culturally congruent,
+        build real money skills and lasting upward mobility using culturally congruent
         strengths-based strategies.
       </p>
 
@@ -143,7 +143,7 @@ export function Compliance() {
   return (
     <Shell
       title="Compliance"
-      intro="Company registration, service availability and platform controls for financial institutions, payment partners and regulatory reviewers."
+      intro="Company registration, service availability and platform controls for financial institutions, payment providers and regulatory reviewers."
     >
       <Contents
         items={[
@@ -226,7 +226,7 @@ export function Compliance() {
 
       <H id="contact">Compliance enquiries</H>
       <p>
-        Regulators and partner compliance teams can email{' '}
+        Regulators and institutional compliance teams can email{' '}
         <a className="underline" href={`mailto:${brand.support.email}?subject=Compliance%20enquiry`}>
           {brand.support.email}
         </a>{' '}

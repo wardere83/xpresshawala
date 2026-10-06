@@ -8,6 +8,9 @@ const media = `${import.meta.env.BASE_URL}media/`
 const FILM_SRC = `${media}community-literacy.mp4`
 const FILM_POSTER = `${media}community-literacy-poster.webp`
 const enquiry = `mailto:${brand.support.email}?subject=Financial%20Literacy%20enquiry`
+// Holds at least 80% navy across the column the words occupy, then clears.
+const FILM_SCRIM =
+  'linear-gradient(to right, rgb(11 37 47 / 0.95) 0%, rgb(11 37 47 / 0.88) 45%, rgb(11 37 47 / 0.8) 62%, rgb(11 37 47 / 0.12) 90%)'
 
 const THEMES = [
   'Real money skills',
@@ -58,8 +61,8 @@ const PLACES = [
  *
  * It plays public/media/community-literacy.mp4 when that file exists and shows
  * the still banner otherwise, so footage can be added without touching this
- * component. Muted, looped and inline, with a pause control because it moves
- * for longer than five seconds.
+ * component (see docs/philanthropy-banner-film.md). Muted, looped and inline,
+ * with a pause control because it moves for longer than five seconds.
  */
 function useBannerFilm() {
   const [available, setAvailable] = useState(false)
@@ -84,8 +87,9 @@ function useBannerFilm() {
 }
 
 function Banner() {
-  const hasFilm = useBannerFilm()
+  const available = useBannerFilm()
   const video = useRef<HTMLVideoElement>(null)
+  const [failed, setFailed] = useState(false)
   const [playing, setPlaying] = useState(false)
   const [reduceMotion, setReduceMotion] = useState(
     () => typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches,
@@ -101,65 +105,88 @@ function Banner() {
     return () => q.removeEventListener('change', onChange)
   }, [])
 
+  // A file that answers as video but cannot be decoded falls back to the still.
+  const hasFilm = available && !failed
+
   return (
     <section className="relative isolate overflow-hidden bg-xt-navy text-white" aria-labelledby="philanthropy-title">
       {hasFilm ? (
-        <video
-          ref={video}
-          className="absolute inset-0 -z-20 h-full w-full object-cover"
-          poster={FILM_POSTER}
-          autoPlay={!reduceMotion}
-          muted
-          loop
-          playsInline
-          preload="metadata"
-          aria-label="Community members of different ages and backgrounds learning about money together in a classroom and around their neighbourhood."
-          onPlay={() => setPlaying(true)}
-          onPause={() => setPlaying(false)}
-        >
-          <source src={FILM_SRC} type="video/mp4" />
-        </video>
+        /*
+         * On phones the film sits above the words, whole and uncovered. From
+         * large screens up it fills the banner behind them.
+         */
+        <div className="relative lg:static">
+          <video
+            ref={video}
+            className="block aspect-video w-full object-cover lg:absolute lg:inset-0 lg:-z-20 lg:aspect-auto lg:h-full"
+            poster={FILM_POSTER}
+            autoPlay={!reduceMotion}
+            muted
+            loop
+            playsInline
+            preload="metadata"
+            aria-hidden="true"
+            onPlay={() => setPlaying(true)}
+            onPause={() => setPlaying(false)}
+            onError={() => setFailed(true)}
+          >
+            <source src={FILM_SRC} type="video/mp4" onError={() => setFailed(true)} />
+          </video>
+          <button
+            type="button"
+            className="absolute bottom-3 right-3 grid h-11 w-11 place-items-center rounded-full border border-white/40 bg-xt-navy text-white hover:bg-brand-700 focus-visible:shadow-[0_0_0_6px_#0b252f] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-xt-turquoise lg:bottom-5 lg:right-5"
+            onClick={() => {
+              if (playing) video.current?.pause()
+              else void video.current?.play().catch(() => {})
+            }}
+            aria-label={playing ? 'Pause the film' : 'Play the film'}
+          >
+            {playing
+              ? <Pause size={18} fill="currentColor" aria-hidden="true" />
+              : <Play size={18} fill="currentColor" aria-hidden="true" />}
+          </button>
+        </div>
       ) : (
         <div
           aria-hidden="true"
           className="absolute inset-0 -z-20 bg-[radial-gradient(90%_70%_at_85%_10%,rgba(75,209,211,0.34),transparent_60%),radial-gradient(70%_60%_at_5%_100%,rgba(131,166,176,0.3),transparent_65%)]"
         />
       )}
-      {/* Scrim so the words stay legible whatever the frame underneath does. */}
-      <div aria-hidden="true" className="absolute inset-0 -z-10 bg-gradient-to-r from-xt-navy via-xt-navy/80 to-xt-navy/30" />
-
-      <div className="mx-auto max-w-5xl px-5 py-20 sm:px-8 sm:py-28 lg:py-36">
-        <p className="text-xs font-semibold uppercase tracking-widest text-xt-turquoise">Philanthropy</p>
-        <h1 id="philanthropy-title" className="mt-5 max-w-3xl text-4xl font-semibold tracking-tight sm:text-5xl lg:text-6xl">
-          XpressTend Financial Literacy
-        </h1>
-        <p className="mt-6 max-w-2xl text-lg leading-relaxed text-white/90 sm:text-xl">
-          Real money skills. Lasting upward mobility. Built alongside the communities we call home.
-        </p>
-        <ul className="mt-9 flex max-w-3xl flex-wrap gap-2.5" aria-label="What this work stands for">
-          {THEMES.map((theme) => (
-            <li key={theme} className="rounded-full border border-white/25 bg-white/10 px-4 py-1.5 text-sm font-medium backdrop-blur-sm">
-              {theme}
-            </li>
-          ))}
-        </ul>
-      </div>
-
+      {/* Scrim: dense under the words, clear over the rest of the film. */}
       {hasFilm ? (
-        <button
-          type="button"
-          className="absolute bottom-5 right-5 grid h-11 w-11 place-items-center rounded-full border border-white/40 bg-xt-navy/60 text-white backdrop-blur-sm hover:bg-xt-navy focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-xt-turquoise"
-          onClick={() => {
-            if (playing) video.current?.pause()
-            else void video.current?.play().catch(() => {})
-          }}
-          aria-label={playing ? 'Pause the film' : 'Play the film'}
-        >
-          {playing
-            ? <Pause size={18} fill="currentColor" aria-hidden="true" />
-            : <Play size={18} fill="currentColor" aria-hidden="true" />}
-        </button>
-      ) : null}
+        <div aria-hidden="true" className="absolute inset-0 -z-10 hidden lg:block" style={{ backgroundImage: FILM_SCRIM }} />
+      ) : (
+        <div aria-hidden="true" className="absolute inset-0 -z-10 bg-gradient-to-r from-xt-navy via-xt-navy/80 to-xt-navy/30" />
+      )}
+
+      <div
+        className={`mx-auto max-w-5xl px-5 sm:px-8 ${hasFilm
+          ? 'py-12 sm:py-14 lg:flex lg:min-h-[40rem] lg:flex-col lg:justify-center lg:py-24'
+          : 'py-20 sm:py-28 lg:py-36'}`}
+      >
+        <div className={hasFilm ? 'lg:max-w-xl' : undefined}>
+          <p className="text-xs font-semibold uppercase tracking-widest text-xt-turquoise">Philanthropy</p>
+          <h1 id="philanthropy-title" className="mt-5 max-w-3xl text-4xl font-semibold tracking-tight sm:text-5xl lg:text-6xl">
+            XpressTend Financial Literacy
+          </h1>
+          <p className="mt-6 max-w-2xl text-lg leading-relaxed text-white/90 sm:text-xl">
+            Real money skills. Lasting upward mobility. Built alongside the communities we call home.
+          </p>
+          <ul className="mt-9 flex max-w-3xl flex-wrap gap-2.5" aria-label="What this work stands for">
+            {THEMES.map((theme) => (
+              <li key={theme} className="rounded-full border border-white/25 bg-white/10 px-4 py-1.5 text-sm font-medium backdrop-blur-sm">
+                {theme}
+              </li>
+            ))}
+          </ul>
+          {hasFilm ? (
+            <p className="sr-only">
+              Banner film: community members of different ages and backgrounds learning about
+              money together in a classroom and around their neighbourhood.
+            </p>
+          ) : null}
+        </div>
+      </div>
     </section>
   )
 }
@@ -214,12 +241,12 @@ export function Philanthropy() {
         <section className="mx-auto max-w-5xl px-5 py-16 sm:px-8 sm:py-20" aria-labelledby="approach-heading">
           <Eyebrow>Our approach</Eyebrow>
           <h2 id="approach-heading" className="mt-4 max-w-3xl text-3xl font-semibold tracking-tight sm:text-4xl">
-            Culturally congruent, strengths-based strategies.
+            Culturally congruent strengths-based strategies.
           </h2>
           <p className="mt-6 max-w-3xl text-base leading-relaxed text-ink-700 sm:text-lg">
             Every community we work with already holds deep financial knowledge: families who
             budget across two currencies, savings circles built on trust, and entrepreneurs who
-            started with very little. We support through culturally congruent, strengths-based
+            started with very little. We support through culturally congruent strengths-based
             strategies that begin with those strengths and build on them.
           </p>
           <div className="mt-10 grid gap-5 md:grid-cols-3">
