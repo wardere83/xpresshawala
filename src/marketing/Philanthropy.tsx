@@ -87,9 +87,19 @@ function Banner() {
   const hasFilm = useBannerFilm()
   const video = useRef<HTMLVideoElement>(null)
   const [playing, setPlaying] = useState(false)
-  const [reduceMotion] = useState(
+  const [reduceMotion, setReduceMotion] = useState(
     () => typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches,
   )
+
+  useEffect(() => {
+    const q = window.matchMedia('(prefers-reduced-motion: reduce)')
+    const onChange = (e: MediaQueryListEvent) => {
+      setReduceMotion(e.matches)
+      if (e.matches) video.current?.pause()
+    }
+    q.addEventListener('change', onChange)
+    return () => q.removeEventListener('change', onChange)
+  }, [])
 
   return (
     <section className="relative isolate overflow-hidden bg-xt-navy text-white" aria-labelledby="philanthropy-title">
