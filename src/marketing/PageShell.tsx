@@ -1,11 +1,11 @@
-import { useEffect } from 'react'
 import { Link, NavLink } from 'react-router-dom'
 import { brand } from '../config/brand'
 import { Logo } from '../components/Logo'
+import { usePageTitle } from './usePageTitle'
 
 const COMPANY_NAV = [
   { to: '/company', label: 'Company' },
-  { to: '/partners', label: 'Partnerships' },
+  { to: '/philanthropy', label: 'Philanthropy' },
   { to: '/compliance', label: 'Compliance' },
   { to: '/security', label: 'Security' },
 ]
@@ -32,43 +32,11 @@ export function Shell({
   updated?: string
   children: React.ReactNode
 }) {
-  useEffect(() => {
-    const previousTitle = document.title
-    document.title = `${title} | ${brand.name}`
-    window.scrollTo(0, 0)
-    return () => { document.title = previousTitle }
-  }, [title])
+  usePageTitle(title)
 
   return (
     <div lang="en" dir="ltr" className="min-h-dvh bg-white text-ink-900">
-      <a
-        className="sr-only z-50 rounded-lg bg-white p-3 text-sm font-semibold focus:not-sr-only focus:absolute focus:left-4 focus:top-4"
-        href="#company-content"
-        onClick={(event) => {
-          event.preventDefault()
-          scrollToSection('company-content')
-        }}
-      >
-        Skip to content
-      </a>
-      <header className="border-b border-ink-200/70 pt-[env(safe-area-inset-top)]">
-        <div className="mx-auto flex max-w-5xl flex-col gap-5 px-5 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-8">
-          <Link className="w-fit rounded-lg focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand-600" to="/" aria-label={`${brand.name} home`}>
-            <Logo variant="full" height={42} />
-          </Link>
-          <nav aria-label="Company" className="flex flex-wrap gap-x-1 gap-y-1 text-sm">
-            {COMPANY_NAV.map((item) => (
-              <NavLink
-                key={item.to}
-                to={item.to}
-                className={({ isActive }) => `rounded-lg px-3 py-2 font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600 ${isActive ? 'bg-brand-50 text-brand-700' : 'text-ink-600 hover:bg-canvas hover:text-brand-700'}`}
-              >
-                {item.label}
-              </NavLink>
-            ))}
-          </nav>
-        </div>
-      </header>
+      <PageHeader />
       <main id="company-content" tabIndex={-1} className="mx-auto max-w-5xl px-5 py-10 focus:outline-none sm:px-8 sm:py-14">
         <div className="max-w-3xl border-b border-ink-200 pb-8 sm:pb-10">
           <p className="text-xs font-semibold uppercase tracking-widest text-brand-700">{brand.legalName}</p>
@@ -80,6 +48,42 @@ export function Shell({
       </main>
       <PageFooter />
     </div>
+  )
+}
+
+/** Skip link and company navigation shared by every institutional page. */
+export function PageHeader() {
+  return (
+    <>
+    <a
+      className="sr-only z-50 rounded-lg bg-white p-3 text-sm font-semibold focus:not-sr-only focus:absolute focus:left-4 focus:top-4"
+      href="#company-content"
+      onClick={(event) => {
+        event.preventDefault()
+        scrollToSection('company-content')
+      }}
+    >
+      Skip to content
+    </a>
+    <header className="border-b border-ink-200/70 pt-[env(safe-area-inset-top)]">
+      <div className="mx-auto flex max-w-5xl flex-col gap-5 px-5 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-8">
+        <Link className="w-fit rounded-lg focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand-600" to="/" aria-label={`${brand.name} home`}>
+          <Logo variant="full" height={42} />
+        </Link>
+        <nav aria-label="Company" className="flex flex-wrap gap-x-1 gap-y-1 text-sm">
+          {COMPANY_NAV.map((item) => (
+            <NavLink
+              key={item.to}
+              to={item.to}
+              className={({ isActive }) => `rounded-lg px-3 py-2 font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600 ${isActive ? 'bg-brand-50 text-brand-700' : 'text-ink-600 hover:bg-canvas hover:text-brand-700'}`}
+            >
+              {item.label}
+            </NavLink>
+          ))}
+        </nav>
+      </div>
+    </header>
+    </>
   )
 }
 

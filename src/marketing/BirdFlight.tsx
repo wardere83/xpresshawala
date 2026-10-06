@@ -148,7 +148,8 @@ export function BirdFlight({ title }: { title: string }) {
       if (!flown.current && !animation.current && running && geometry) {
         setPhase('flying')
         const distance = Math.hypot(geometry.end.x - geometry.start.x, geometry.end.y - geometry.start.y)
-        fly(geometry, Math.min(6000, Math.max(3800, 2400 + distance * 6)))
+        // An unhurried glide: slow enough to follow all the way to its perch.
+        fly(geometry, Math.min(14000, Math.max(9000, 5600 + distance * 14)))
       } else if (animation.current) {
         if (running) animation.current.play()
         else animation.current.pause()

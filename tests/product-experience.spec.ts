@@ -14,7 +14,7 @@ test.beforeEach(async ({ page }) => {
 
 const corporateHeadline = /Connecting people\.\s*Enabling possibility\./
 
-test('the public homepage leads to company information and a working partnership enquiry', async ({
+test('the public homepage leads to company information and a working philanthropy enquiry', async ({
   page,
 }) => {
   const errors: string[] = []
@@ -28,7 +28,7 @@ test('the public homepage leads to company information and a working partnership
   })
   await page.goto('/')
   await expect(page.getByRole('heading', { level: 1 })).toHaveText(corporateHeadline)
-  for (const name of ['Company', 'Compliance', 'Security', 'Partnerships']) {
+  for (const name of ['Company', 'Compliance', 'Security', 'Philanthropy']) {
     await expect(page.locator('header').getByRole('link', { name, exact: true })).toBeVisible()
   }
 
@@ -46,12 +46,12 @@ test('the public homepage leads to company information and a working partnership
   await expect(page).toHaveURL(/#\/company$/)
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('About XpressTend')
   await page.goto('/')
-  await page.locator('header').getByRole('link', { name: 'Partnerships', exact: true }).click()
-  await expect(page).toHaveURL(/#\/partners$/)
-  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Partner with XpressTend')
+  await page.locator('header').getByRole('link', { name: 'Philanthropy', exact: true }).click()
+  await expect(page).toHaveURL(/#\/philanthropy$/)
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('XpressTend Financial Literacy')
   await expect(
     page.locator('main a[href^="mailto:"][href*="subject="]').first(),
-  ).toHaveAttribute('href', /^mailto:support@xpresstend\.com\?subject=Partnership%20enquiry$/)
+  ).toHaveAttribute('href', /^mailto:support@xpresstend\.com\?subject=Financial%20Literacy%20enquiry$/)
   expect(errors).toEqual([])
 })
 
@@ -165,10 +165,10 @@ for (const width of [320, 390, 768, 1440]) {
     await page.setViewportSize({ width, height: 900 })
     await page.goto('/')
     await expect(page.getByRole('heading', { level: 1 })).toHaveText(corporateHeadline)
-    await expect(page.locator('header').getByRole('link', { name: 'Partnerships', exact: true })).toBeVisible()
+    await expect(page.locator('header').getByRole('link', { name: 'Philanthropy', exact: true })).toBeVisible()
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width)
 
-    for (const [name, path] of [['Company', 'company'], ['Partnerships', 'partners']]) {
+    for (const [name, path] of [['Company', 'company'], ['Philanthropy', 'philanthropy']]) {
       await page.locator('header').getByRole('link', { name, exact: true }).click()
       await expect(page).toHaveURL(new RegExp(`#/${path}$`))
       await expect(page.locator('header').getByRole('link', { name, exact: true })).toHaveAttribute('aria-current', 'page')
@@ -200,9 +200,9 @@ for (const [language, explore] of [
     await expect(page.getByRole('heading', { level: 1 })).not.toHaveText(corporateHeadline)
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390)
 
-    await page.locator('header a[href="#/partners"]').click()
-    await expect(page).toHaveURL(/#\/partners$/)
-    await expect(page.getByRole('heading', { level: 1 })).toHaveText('Partner with XpressTend')
+    await page.locator('header a[href="#/philanthropy"]').click()
+    await expect(page).toHaveURL(/#\/philanthropy$/)
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText('XpressTend Financial Literacy')
     // Institutional and legal pages are published in English, including when
     // reached from an Arabic homepage.
     await expect(page.locator('main').locator('..')).toHaveAttribute('lang', 'en')
@@ -251,7 +251,7 @@ test('company pages show a plain NMLS ID and accurate service availability', asy
   for (const [path, heading] of [
     ['company', 'About XpressTend'],
     ['security', 'Security and platform'],
-    ['partners', 'Partner with XpressTend'],
+    ['philanthropy', 'XpressTend Financial Literacy'],
   ]) {
     await page.goto(`/#/${path}`)
     await expect(page.getByRole('heading', { level: 1 })).toHaveText(heading)
@@ -267,7 +267,7 @@ test('footer company, support and privacy links reach their intended pages', asy
     ['Company', 'About XpressTend'],
     ['Compliance', 'Compliance'],
     ['Security', 'Security and platform'],
-    ['Partnerships', 'Partner with XpressTend'],
+    ['Philanthropy', 'XpressTend Financial Literacy'],
     ['Contact', 'Contact and support'],
     ['Privacy', 'Privacy Policy'],
   ]) {

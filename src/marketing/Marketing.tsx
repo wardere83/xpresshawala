@@ -28,7 +28,7 @@ export function Marketing() {
     { to: '/company', label: labels.trustCompany },
     { to: '/compliance', label: labels.trustCompliance },
     { to: '/security', label: labels.trustSecurity },
-    { to: '/partners', label: labels.trustPartners },
+    { to: '/philanthropy', label: labels.trustPartners },
   ]
 
   useEffect(() => {
@@ -123,7 +123,7 @@ export function Marketing() {
               <a className="brand-primary" href={`mailto:${brand.support.email}?subject=${encodeURIComponent(copy.inquirySubject)}`}>
                 {copy.inquiryAction} <ArrowUpRight size={17} aria-hidden="true" />
               </a>
-              <Link className="brand-text-link" to="/partners">{copy.partnerLink} <ArrowUpRight size={17} aria-hidden="true" /></Link>
+              <Link className="brand-text-link" to="/philanthropy">{copy.partnerLink} <ArrowUpRight size={17} aria-hidden="true" /></Link>
             </div>
           </div>
           <RiverFlow />

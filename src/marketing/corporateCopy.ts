@@ -6,8 +6,7 @@ const en = {
   heroFirst: 'Connecting people.',
   heroSecond: 'Enabling possibility.',
   heroIntro:
-    'XpressTend Financial Services is a Seattle-based cross-border payments company focused on clear, accessible remittance experiences and responsible financial partnerships.',
-  partnerAction: 'Discuss a partnership',
+    'XpressTend Financial Services is a Seattle-based cross-border payments company focused on clear, accessible remittance experiences and lasting investment in the communities we serve.',
   companyAction: 'Discover XpressTend',
   companyEyebrow: 'XpressTend Financial Services',
   companyTitle: 'A clear purpose. A responsible approach.',
@@ -29,19 +28,19 @@ const en = {
   accountabilityTitle: 'Accountable operations',
   accountabilityBody:
     'Identity checks, transaction review, and documented controls guide our operational approach.',
-  partnerEyebrow: 'Partnerships',
-  partnerTitle: 'Let’s connect the next opportunity.',
+  partnerEyebrow: 'Philanthropy',
+  partnerTitle: 'Let’s also make financial literacy cool.',
   partnerBody:
-    'We welcome discussions with financial institutions, fintech companies, and payment infrastructure providers about banking, payouts, identity verification, and payment connectivity.',
-  partnerLink: 'Explore partnership opportunities',
+    'We build real money skills and lasting upward mobility in underserved communities across Washington state, Nairobi, São Paulo, and beyond.',
+  partnerLink: 'Explore XpressTend Financial Literacy',
   trustEyebrow: 'Company information',
   trustTitle: 'Confidence starts with clarity.',
   trustBody:
-    'Review our company profile, compliance approach, and security practices, or contact us directly for a partnership discussion.',
+    'Review our company profile, compliance approach, and security practices, or see how we invest in the communities we serve.',
   footerContact: 'Contact',
   footerPrivacy: 'Privacy',
   inquiryAction: 'Contact XpressTend',
-  inquirySubject: 'Partnership enquiry',
+  inquirySubject: 'Financial Literacy enquiry',
 } as const
 
 type CorporateCopy = { [K in keyof typeof en]: string }
@@ -52,8 +51,7 @@ const so: CorporateCopy = {
   heroFirst: 'Dadka ayaan isku xirnaa.',
   heroSecond: 'Fursado ayaan suuragelinnaa.',
   heroIntro:
-    'XpressTend Financial Services waa shirkad lacag-bixineed oo fadhigeedu yahay Seattle, kana shaqaysa lacag-bixinta xuduudaha ka gudubta. Waxaan diiradda saarnaa adeegyo xawaaladeed oo cad oo la heli karo iyo iskaashi maaliyadeed oo mas’uuliyad leh.',
-  partnerAction: 'Ka wada hadal iskaashi',
+    'XpressTend Financial Services waa shirkad lacag-bixineed oo fadhigeedu yahay Seattle, kana shaqaysa lacag-bixinta xuduudaha ka gudubta. Waxaan diiradda saarnaa adeegyo xawaaladeed oo cad oo la heli karo iyo maalgashi waara oo aan ku samayno bulshooyinka aan u adeegno.',
   companyAction: 'Baro XpressTend',
   companyEyebrow: 'XpressTend Financial Services',
   companyTitle: 'Ujeeddo cad. Hab mas’uuliyad leh.',
@@ -75,19 +73,19 @@ const so: CorporateCopy = {
   accountabilityTitle: 'Hawlgal lala xisaabtami karo',
   accountabilityBody:
     'Hubinta aqoonsiga, dib-u-eegista macaamilada iyo habraacyo la diiwaangeliyay ayaa hagaya habkayaga hawlgalka.',
-  partnerEyebrow: 'Iskaashiyada',
-  partnerTitle: 'Aan wada abuurno fursadda xigta.',
+  partnerEyebrow: 'Samafal',
+  partnerTitle: 'Aan sidoo kale aqoonta maaliyadda ka dhigno wax xiiso leh.',
   partnerBody:
-    'Waxaan soo dhoweynaynaa wada-hadallada hay’adaha maaliyadda, shirkadaha tignoolajiyada maaliyadda iyo bixiyeyaasha kaabayaasha lacag-bixinta ee ku saabsan adeegyada bangiyada, bixinta lacagaha, xaqiijinta aqoonsiga iyo isku xirka nidaamyada lacag-bixinta.',
-  partnerLink: 'Sahami fursadaha iskaashiga',
+    'Waxaan bulshooyinka aan helin adeeg ku filan ee ku nool gobolka Washington, Nairobi, São Paulo iyo meelo kale ka dhisnaa xirfado dhab ah oo lacag-maamul iyo horumar nololeed oo waara.',
+  partnerLink: 'Baro XpressTend Financial Literacy',
   trustEyebrow: 'Macluumaadka shirkadda',
   trustTitle: 'Kalsoonidu waxay ka bilaabataa caddayn.',
   trustBody:
-    'Eeg xogta shirkaddayada, habkayaga u hoggaansanaanta sharciga iyo dhaqamadayada amniga, ama si toos ah noogala soo xiriir wada-hadal iskaashi.',
+    'Eeg xogta shirkaddayada, habkayaga u hoggaansanaanta sharciga iyo dhaqamadayada amniga, ama arag sida aan u maalgashanno bulshooyinka aan u adeegno.',
   footerContact: 'Xiriir',
   footerPrivacy: 'Asturnaanta',
   inquiryAction: 'La xiriir XpressTend',
-  inquirySubject: 'Weydiin ku saabsan iskaashi',
+  inquirySubject: 'Weydiin ku saabsan aqoonta maaliyadda',
 }
 
 const es: CorporateCopy = {
@@ -96,8 +94,7 @@ const es: CorporateCopy = {
   heroFirst: 'Conectamos personas.',
   heroSecond: 'Abrimos posibilidades.',
   heroIntro:
-    'XpressTend Financial Services es una empresa de pagos transfronterizos con sede en Seattle, centrada en ofrecer experiencias de remesas claras y accesibles y en establecer alianzas financieras responsables.',
-  partnerAction: 'Conversemos sobre una alianza',
+    'XpressTend Financial Services es una empresa de pagos transfronterizos con sede en Seattle, centrada en ofrecer experiencias de remesas claras y accesibles y en invertir de forma duradera en las comunidades a las que servimos.',
   companyAction: 'Descubra XpressTend',
   companyEyebrow: 'XpressTend Financial Services',
   companyTitle: 'Un propósito claro. Un enfoque responsable.',
@@ -119,19 +116,19 @@ const es: CorporateCopy = {
   accountabilityTitle: 'Operaciones responsables',
   accountabilityBody:
     'Las comprobaciones de identidad, la revisión de transacciones y los controles documentados orientan nuestro enfoque operativo.',
-  partnerEyebrow: 'Alianzas',
-  partnerTitle: 'Conectemos la próxima oportunidad.',
+  partnerEyebrow: 'Filantropía',
+  partnerTitle: 'Hagamos también que la educación financiera sea genial.',
   partnerBody:
-    'Recibimos con interés las conversaciones con instituciones financieras, empresas de tecnología financiera y proveedores de infraestructura de pagos sobre servicios bancarios, desembolsos, verificación de identidad y conectividad de pagos.',
-  partnerLink: 'Explore oportunidades de colaboración',
+    'Desarrollamos habilidades financieras reales y una movilidad ascendente duradera en comunidades desatendidas del estado de Washington, Nairobi, São Paulo y más allá.',
+  partnerLink: 'Conozca XpressTend Financial Literacy',
   trustEyebrow: 'Información de la empresa',
   trustTitle: 'La confianza empieza con claridad.',
   trustBody:
-    'Consulte el perfil de nuestra empresa, nuestro enfoque de cumplimiento y nuestras prácticas de seguridad, o contáctenos directamente para conversar sobre una alianza.',
+    'Consulte el perfil de nuestra empresa, nuestro enfoque de cumplimiento y nuestras prácticas de seguridad, o descubra cómo invertimos en las comunidades a las que servimos.',
   footerContact: 'Contacto',
   footerPrivacy: 'Privacidad',
   inquiryAction: 'Contactar con XpressTend',
-  inquirySubject: 'Consulta sobre una alianza',
+  inquirySubject: 'Consulta sobre educación financiera',
 }
 
 const pt: CorporateCopy = {
@@ -140,8 +137,7 @@ const pt: CorporateCopy = {
   heroFirst: 'Conectamos pessoas.',
   heroSecond: 'Criamos possibilidades.',
   heroIntro:
-    'A XpressTend Financial Services é uma empresa de pagamentos internacionais com sede em Seattle, focada em experiências de remessas claras e acessíveis e em parcerias financeiras responsáveis.',
-  partnerAction: 'Converse sobre uma parceria',
+    'A XpressTend Financial Services é uma empresa de pagamentos internacionais com sede em Seattle, focada em experiências de remessas claras e acessíveis e em um investimento duradouro nas comunidades que atendemos.',
   companyAction: 'Conheça a XpressTend',
   companyEyebrow: 'XpressTend Financial Services',
   companyTitle: 'Um propósito claro. Uma abordagem responsável.',
@@ -163,19 +159,19 @@ const pt: CorporateCopy = {
   accountabilityTitle: 'Operações responsáveis',
   accountabilityBody:
     'Verificações de identidade, análise de transações e controles documentados orientam nossa abordagem operacional.',
-  partnerEyebrow: 'Parcerias',
-  partnerTitle: 'Vamos conectar a próxima oportunidade.',
+  partnerEyebrow: 'Filantropia',
+  partnerTitle: 'Vamos também fazer da educação financeira algo descolado.',
   partnerBody:
-    'Estamos abertos a conversas com instituições financeiras, empresas de tecnologia financeira e provedores de infraestrutura de pagamentos sobre serviços bancários, desembolsos, verificação de identidade e conectividade de pagamentos.',
-  partnerLink: 'Explore oportunidades de parceria',
+    'Desenvolvemos habilidades financeiras reais e mobilidade social duradoura em comunidades desassistidas no estado de Washington, em Nairóbi, em São Paulo e além.',
+  partnerLink: 'Conheça o XpressTend Financial Literacy',
   trustEyebrow: 'Informações da empresa',
   trustTitle: 'A confiança começa com clareza.',
   trustBody:
-    'Conheça o perfil da nossa empresa, nossa abordagem de conformidade e nossas práticas de segurança, ou entre em contato diretamente para conversar sobre uma parceria.',
+    'Conheça o perfil da nossa empresa, nossa abordagem de conformidade e nossas práticas de segurança, ou veja como investimos nas comunidades que atendemos.',
   footerContact: 'Contato',
   footerPrivacy: 'Privacidade',
   inquiryAction: 'Entre em contato com a XpressTend',
-  inquirySubject: 'Consulta sobre parceria',
+  inquirySubject: 'Consulta sobre educação financeira',
 }
 
 const ar: CorporateCopy = {
@@ -184,8 +180,7 @@ const ar: CorporateCopy = {
   heroFirst: 'نصل بين الناس.',
   heroSecond: 'نفتح آفاقاً جديدة.',
   heroIntro:
-    'XpressTend Financial Services شركة مدفوعات عبر الحدود مقرها سياتل، تركز على تجارب تحويل أموال واضحة ومتاحة للجميع، وعلى شراكات مالية مسؤولة.',
-  partnerAction: 'ناقش فرصة شراكة',
+    'XpressTend Financial Services شركة مدفوعات عبر الحدود مقرها سياتل، تركز على تجارب تحويل أموال واضحة ومتاحة للجميع، وعلى استثمار دائم في المجتمعات التي نخدمها.',
   companyAction: 'تعرّف على XpressTend',
   companyEyebrow: 'XpressTend Financial Services',
   companyTitle: 'هدف واضح. ونهج مسؤول.',
@@ -207,19 +202,19 @@ const ar: CorporateCopy = {
   accountabilityTitle: 'عمليات تخضع للمساءلة',
   accountabilityBody:
     'توجّه عمليات التحقق من الهوية ومراجعة المعاملات والضوابط الموثّقة نهجنا التشغيلي.',
-  partnerEyebrow: 'الشراكات',
-  partnerTitle: 'لنفتح معاً فرصة جديدة.',
+  partnerEyebrow: 'العمل الخيري',
+  partnerTitle: 'لنجعل الثقافة المالية ممتعة أيضاً.',
   partnerBody:
-    'نرحّب بالمناقشات مع المؤسسات المالية وشركات التقنية المالية ومزوّدي البنية التحتية للمدفوعات حول الخدمات المصرفية وصرف الأموال والتحقق من الهوية والربط بين أنظمة الدفع.',
-  partnerLink: 'استكشف فرص الشراكة',
+    'نبني مهارات مالية حقيقية وارتقاءً اجتماعياً واقتصادياً دائماً في المجتمعات المحرومة من الخدمات في ولاية واشنطن ونيروبي وساو باولو وخارجها.',
+  partnerLink: 'استكشف XpressTend Financial Literacy',
   trustEyebrow: 'معلومات الشركة',
   trustTitle: 'الثقة تبدأ بالوضوح.',
   trustBody:
-    'اطّلع على ملف شركتنا ونهجنا في الامتثال وممارساتنا الأمنية، أو تواصل معنا مباشرة لمناقشة شراكة.',
+    'اطّلع على ملف شركتنا ونهجنا في الامتثال وممارساتنا الأمنية، أو تعرّف على كيفية استثمارنا في المجتمعات التي نخدمها.',
   footerContact: 'التواصل',
   footerPrivacy: 'الخصوصية',
   inquiryAction: 'تواصل مع XpressTend',
-  inquirySubject: 'استفسار بشأن شراكة',
+  inquirySubject: 'استفسار بشأن الثقافة المالية',
 }
 
 const dictionaries: Record<Lang, CorporateCopy> = {

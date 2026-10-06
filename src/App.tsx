@@ -21,7 +21,7 @@ const Marketing = lazy(() => import('./marketing/Marketing').then(module => ({ d
 
 const Company = lazy(() => import('./marketing/Company').then(module => ({ default: module.Company })))
 const Compliance = lazy(() => import('./marketing/Company').then(module => ({ default: module.Compliance })))
-const Partners = lazy(() => import('./marketing/Company').then(module => ({ default: module.Partners })))
+const Philanthropy = lazy(() => import('./marketing/Philanthropy').then(module => ({ default: module.Philanthropy })))
 const Security = lazy(() => import('./marketing/Company').then(module => ({ default: module.Security })))
 
 const Home = lazy(() => import('./screens/Home').then(module => ({ default: module.Home })))
@@ -74,7 +74,9 @@ export default function App() {
               <Route path="/company" element={<Company />} />
               <Route path="/compliance" element={<Compliance />} />
               <Route path="/security" element={<Security />} />
-              <Route path="/partners" element={<Partners />} />
+              <Route path="/philanthropy" element={<Philanthropy />} />
+              {/* The former partnerships address; old links land on philanthropy. */}
+              <Route path="/partners" element={<Navigate to="/philanthropy" replace />} />
 
               {/* Staff console — its own login, never the customer session. */}
               <Route path="/admin" element={<AdminConsole />} />

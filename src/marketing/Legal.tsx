@@ -96,7 +96,8 @@ export function Privacy() {
 }
 
 const CONTACT_ROUTES = [
-  { label: 'Partnership enquiries', subject: 'Partnership enquiry', description: 'Banking, fintech and payment infrastructure collaboration.' },
+  { label: 'Institutional enquiries', subject: 'Institutional enquiry', description: 'Banking, fintech and payment infrastructure collaboration.' },
+  { label: 'Financial Literacy enquiries', subject: 'Financial Literacy enquiry', description: 'XpressTend Financial Literacy, our philanthropy and community programs.' },
   { label: 'Compliance enquiries', subject: 'Compliance enquiry', description: 'Institutional review, registration and compliance information.' },
   { label: 'Customer support', subject: 'Customer support', description: 'Account access, product questions and general assistance.' },
   { label: 'Security reports', subject: 'Security report', description: 'Potential vulnerabilities or suspicious account activity.' },
@@ -119,7 +120,7 @@ export function Support() {
   return (
     <Shell
       title="Contact and support"
-      intro="Contact XpressTend for company enquiries, partnership discussions, account assistance and institutional review."
+      intro="Contact XpressTend for company enquiries, community programs, account assistance and institutional review."
       updated={UPDATED}
     >
       <Contents
@@ -168,8 +169,7 @@ export function Support() {
       <p>{brand.legal.operatingStatus}</p>
       <p>
         For information about service requirements and institutional onboarding, review our{' '}
-        <Link className="underline" to="/compliance">compliance overview</Link> or{' '}
-        <Link className="underline" to="/partners">partnerships page</Link>.
+        <Link className="underline" to="/compliance">compliance overview</Link>.
       </p>
 
       <H id="questions">Common questions</H>

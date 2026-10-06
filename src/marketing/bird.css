@@ -42,7 +42,7 @@
 }
 .xt-bird[data-phase='flying'] .xt-bird-flight-wing {
   display: block;
-  animation: xt-bird-wing 0.44s ease-in-out infinite alternate;
+  animation: xt-bird-wing 0.62s ease-in-out infinite alternate;
 }
 .xt-bird[data-phase='flying'] .xt-bird-folded-wing {
   display: none;
