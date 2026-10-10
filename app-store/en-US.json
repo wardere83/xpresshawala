@@ -1,0 +1,12 @@
+{
+  "bundleId": "com.xpresstend.app",
+  "version": "1.0",
+  "build": "83",
+  "locale": "en-US",
+  "copyright": "2026 XpressTend",
+  "promotionalText": "Explore XpressTend’s multilingual financial experience, manage your profile, and preview recipient and transfer workflows in test mode.",
+  "description": "XpressTend brings account management and a guided cross-border transfer experience together in one convenient app.\n\nCreate and manage your account, explore recipient workflows, and preview the transfer experience through an intuitive interface.\n\nFeatures include:\n• Account registration and profile management.\n• Recipient and transfer workflows.\n• Explore mode with clearly labeled sample data.\n• Supported device authentication to protect account access.\n• Password recovery, account deletion, and support.\n• English, Somali, Spanish, Portuguese, and Arabic interfaces.\n\nThis version operates in test mode. Transfers do not charge bank accounts or cards and do not deliver money. Explore mode uses illustrative balances, rates, and activity that do not represent customer funds.",
+  "keywords": "finance,remittance,multilingual,recipients,cross border,transfer preview",
+  "supportUrl": "https://xpresstend.com/support",
+  "marketingUrl": "https://xpresstend.com"
+}

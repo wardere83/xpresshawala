@@ -1,0 +1,40 @@
+name: Save App Store listing
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'app-store/en-US.json'
+      - 'scripts/app-store/save-listing.mjs'
+      - '.github/workflows/app-store-listing.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: app-store-listing
+  cancel-in-progress: false
+
+jobs:
+  save-listing:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Save listing metadata and attach processed build
+        env:
+          APPSTORE_PRIVATE_KEY: ${{ secrets.APPSTORE_PRIVATE_KEY }}
+          APPSTORE_KEY_ID: ${{ secrets.APPSTORE_KEY_ID }}
+          APPSTORE_ISSUER_ID: ${{ secrets.APPSTORE_ISSUER_ID }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          KEY_PATH="$RUNNER_TEMP/app-store-listing-key.p8"
+          trap 'rm -f "$KEY_PATH"' EXIT
+          scripts/ci/decode-base64-secret.sh APPSTORE_PRIVATE_KEY "$KEY_PATH" "App Store Connect key"
+          node scripts/app-store/save-listing.mjs "$KEY_PATH" app-store/en-US.json
